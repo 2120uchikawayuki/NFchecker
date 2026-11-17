@@ -1,0 +1,346 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>カメラ固定テスト</title>
+<style>
+  :root { --ink:#1d2433; --sub:#5b6474; --line:#d9dee7; --bg:#f6f7f9; --card:#fff; --accent:#0b6bcb; --ok:#14804a; --ng:#b3261e; --warn:#9a6700; }
+  * { box-sizing:border-box; }
+  body { margin:0; padding:16px 14px 48px; background:var(--bg); color:var(--ink);
+         font-family:"Hiragino Sans","Hiragino Kaku Gothic ProN","Noto Sans JP","Yu Gothic",sans-serif;
+         font-size:16px; line-height:1.7; }
+  main { max-width:640px; margin:0 auto; }
+  h1 { font-size:22px; margin:4px 0 6px; }
+  h2 { font-size:17px; margin:0 0 8px; }
+  p { margin:0 0 10px; }
+  .lead { color:var(--sub); font-size:14px; }
+  section { background:var(--card); border:1px solid var(--line); border-radius:12px; padding:14px; margin:14px 0; }
+  button { font:inherit; font-weight:600; padding:12px 14px; border-radius:10px; border:1px solid var(--accent);
+           background:var(--accent); color:#fff; width:100%; margin:4px 0; }
+  button.sub { background:#fff; color:var(--accent); }
+  button:disabled { opacity:.4; }
+  select, textarea { font:inherit; width:100%; padding:10px; border-radius:10px; border:1px solid var(--line); background:#fff; color:var(--ink); }
+  video { width:100%; max-height:46vh; background:#000; border-radius:10px; margin-top:8px; display:block; object-fit:contain; }
+  table { width:100%; border-collapse:collapse; font-size:14px; }
+  th, td { text-align:left; padding:6px 4px; border-bottom:1px solid var(--line); vertical-align:top; word-break:break-word; }
+  th { color:var(--sub); font-weight:600; font-size:12px; }
+  .ok { color:var(--ok); font-weight:700; } .ng { color:var(--ng); font-weight:700; } .warn { color:var(--warn); font-weight:700; }
+  .msg { font-size:14px; padding:8px 10px; border-radius:8px; background:#fff4e5; color:#7a4b00; margin-top:8px; }
+  .nums { display:grid; grid-template-columns:repeat(4,1fr); gap:6px; margin:8px 0; }
+  .nums div { border:1px solid var(--line); border-radius:8px; padding:6px 4px; text-align:center; }
+  .nums b { display:block; font-size:20px; font-variant-numeric:tabular-nums; }
+  .nums span { font-size:12px; color:var(--sub); }
+  canvas#chart { width:100%; height:140px; border:1px solid var(--line); border-radius:8px; display:block; }
+  #log { font-size:14px; margin:8px 0 0; padding-left:18px; }
+  #log li { margin-bottom:4px; }
+  textarea { height:160px; font-size:12px; font-family:ui-monospace,Menlo,monospace; }
+  .small { font-size:13px; color:var(--sub); }
+  [hidden] { display:none !important; }
+</style>
+</head>
+<body>
+<main>
+  <h1>カメラ固定テスト</h1>
+  <p class="lead">このスマホのブラウザで、カメラの「明るさ」と「色」の自動調整を止められるかを調べます。映像はこのスマホの中だけで使い、どこにも送りません。</p>
+
+  <section>
+    <h2>1. カメラを起動する</h2>
+    <button id="start">カメラを起動する</button>
+    <div id="camWrap" hidden>
+      <p class="small" style="margin-top:8px">使うカメラ（背面に複数あるときは切り替えられます）</p>
+      <select id="cam"></select>
+    </div>
+    <video id="video" playsinline muted autoplay hidden></video>
+    <div id="startMsg" class="msg" hidden></div>
+  </section>
+
+  <section id="s2" hidden>
+    <h2>2. このカメラで選べる項目</h2>
+    <table id="caps"><thead><tr><th>項目</th><th>対応</th><th>選べる値</th><th>今の値</th></tr></thead><tbody></tbody></table>
+    <p class="small" style="margin-top:8px">○＝切り替えられる　△＝名前だけ対応　×＝対応なし</p>
+  </section>
+
+  <section id="s3" hidden>
+    <h2>3. 固定を試す</h2>
+    <button id="lockWB">色（ホワイトバランス）を固定</button>
+    <button id="lockEX">明るさ（露出）を固定</button>
+    <button id="lockFO">ピントを固定</button>
+    <button id="unlock" class="sub">ぜんぶ自動に戻す</button>
+    <ol id="log"></ol>
+  </section>
+
+  <section id="s4" hidden>
+    <h2>4. 本当に止まったか確かめる</h2>
+    <p class="small">カメラを明るい所（窓や照明）と暗い所（机の下など）へ、5秒ずつ交互に向けてください。まず固定する前に一往復、次に「3」で固定してからもう一往復します。<br>
+    自動のままだと、明るさの線はいったん動いたあと真ん中へ戻ろうとします。固定できていれば、明るい所では高いまま、暗い所では低いままになります。</p>
+    <div class="nums">
+      <div><b id="nL">–</b><span>明るさ</span></div>
+      <div><b id="nR">–</b><span>赤</span></div>
+      <div><b id="nG">–</b><span>緑</span></div>
+      <div><b id="nB">–</b><span>青</span></div>
+    </div>
+    <canvas id="chart"></canvas>
+    <p class="small" style="margin-top:6px">線は直近60秒の明るさ。縦の点線は「固定」や「自動に戻す」を押した時点です。</p>
+  </section>
+
+  <section id="s5" hidden>
+    <h2>5. 結果を送る</h2>
+    <p class="small">「4」の往復が終わったら、下のボタンで結果をコピーして、Claudeとのチャットに貼り付けてください。</p>
+    <button id="copy">結果をコピーする</button>
+    <div id="copyMsg" class="msg" hidden></div>
+    <textarea id="report" readonly></textarea>
+  </section>
+</main>
+
+<script>
+(function () {
+  var $ = function (id) { return document.getElementById(id); };
+  var video = $('video');
+  var stream = null, track = null;
+  var applyLog = [];           // {t, label, result}
+  var hist = [];               // {t, L, R, G, B}
+  var marks = [];              // {t, label}
+  var t0 = Date.now();
+  var locks = {};              // key -> value currently requested
+  var sampler = null;
+
+  var KEYS = [
+    ['whiteBalanceMode', '色の調整（ホワイトバランス）'],
+    ['colorTemperature', '色温度'],
+    ['exposureMode', '明るさの調整（露出）'],
+    ['exposureTime', '露出時間'],
+    ['exposureCompensation', '露出補正'],
+    ['iso', '感度（ISO）'],
+    ['focusMode', 'ピントの調整'],
+    ['focusDistance', 'ピント位置'],
+    ['zoom', 'ズーム'],
+    ['torch', 'ライト'],
+    ['frameRate', 'コマ数']
+  ];
+
+  function now() { return Math.round((Date.now() - t0) / 100) / 10; }
+  function show(el, text) { el.textContent = text; el.hidden = false; }
+  function fmt(v) {
+    if (v === undefined) return '–';
+    if (Array.isArray(v)) return v.join(' / ');
+    if (v && typeof v === 'object') {
+      if ('min' in v || 'max' in v) return v.min + '〜' + v.max + (v.step ? '（刻み' + v.step + '）' : '');
+      return JSON.stringify(v);
+    }
+    return String(v);
+  }
+  function getCaps() { try { return (track && track.getCapabilities) ? track.getCapabilities() : {}; } catch (e) { return {}; } }
+  function getSettings() { try { return track ? track.getSettings() : {}; } catch (e) { return {}; } }
+  function getSupported() { try { return navigator.mediaDevices.getSupportedConstraints(); } catch (e) { return {}; } }
+
+  function stopStream() {
+    if (stream) stream.getTracks().forEach(function (t) { t.stop(); });
+    stream = null; track = null;
+  }
+
+  async function start(deviceId) {
+    $('startMsg').hidden = true;
+    if (!window.isSecureContext || !navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      show($('startMsg'), 'このページではカメラを使えません。アドレスが https:// で始まる場所に置いて、SafariかChromeで開いてください。');
+      return;
+    }
+    stopStream();
+    var v = deviceId ? { deviceId: { exact: deviceId } } : { facingMode: { ideal: 'environment' } };
+    v.width = { ideal: 1280 }; v.height = { ideal: 720 };
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({ video: v, audio: false });
+    } catch (e) {
+      show($('startMsg'), 'カメラを起動できませんでした（' + e.name + '）。カメラの使用を「許可」にして、もう一度押してください。');
+      return;
+    }
+    track = stream.getVideoTracks()[0];
+    locks = {};
+    video.srcObject = stream; video.hidden = false;
+    try { await video.play(); } catch (e) {}
+    await listCams();
+    ['s2', 's3', 's4', 's5'].forEach(function (id) { $(id).hidden = false; });
+    $('start').textContent = 'カメラを起動し直す';
+    marks.push({ t: now(), label: '起動' });
+    renderCaps();
+    if (!sampler) sampler = setInterval(sample, 250);
+    sizeChart();
+    updateReport();
+  }
+
+  async function listCams() {
+    try {
+      var devs = (await navigator.mediaDevices.enumerateDevices()).filter(function (d) { return d.kind === 'videoinput'; });
+      var sel = $('cam'); sel.innerHTML = '';
+      var cur = getSettings().deviceId;
+      devs.forEach(function (d, i) {
+        var o = document.createElement('option');
+        o.value = d.deviceId; o.textContent = d.label || ('カメラ ' + (i + 1));
+        if (d.deviceId === cur) o.selected = true;
+        sel.appendChild(o);
+      });
+      $('camWrap').hidden = devs.length < 2;
+    } catch (e) {}
+  }
+
+  function renderCaps() {
+    var caps = getCaps(), st = getSettings(), sup = getSupported();
+    var tb = $('caps').querySelector('tbody'); tb.innerHTML = '';
+    KEYS.forEach(function (k) {
+      var tr = document.createElement('tr');
+      var mark = (k[0] in caps) ? ['○', 'ok'] : (sup[k[0]] ? ['△', 'warn'] : ['×', 'ng']);
+      [k[1], mark[0], fmt(caps[k[0]]), fmt(st[k[0]])].forEach(function (text, i) {
+        var td = document.createElement('td'); td.textContent = text;
+        if (i === 1) td.className = mark[1];
+        tr.appendChild(td);
+      });
+      tb.appendChild(tr);
+    });
+  }
+
+  function pickMode(key, wantAuto) {
+    var list = getCaps()[key];
+    var order = wantAuto ? ['continuous'] : ['manual', 'none', 'single-shot'];
+    if (Array.isArray(list)) {
+      for (var i = 0; i < order.length; i++) if (list.indexOf(order[i]) >= 0) return order[i];
+      return null;
+    }
+    return order[0];   // not reported: try anyway
+  }
+
+  function addLog(label, result) {
+    var t = now();
+    applyLog.push({ t: t, label: label, result: result });
+    var li = document.createElement('li'); li.textContent = label + ' → ' + result; $('log').appendChild(li);
+    return t;
+  }
+
+  async function applyLocks(label) {
+    var sets = Object.keys(locks).map(function (k) { var o = {}; o[k] = locks[k]; return o; });
+    var result, ok = true;
+    try {
+      await track.applyConstraints(sets.length ? { advanced: sets } : {});
+      var st = getSettings();
+      result = '受け付けられました。今の値： ' + ['whiteBalanceMode', 'exposureMode', 'focusMode'].map(function (k) { return k + '=' + fmt(st[k]); }).join(', ');
+    } catch (e) {
+      ok = false;
+      result = '断られました（' + e.name + (e.message ? ': ' + e.message : '') + '）';
+    }
+    marks.push({ t: addLog(label, result), label: label });
+    renderCaps(); updateReport();
+    return ok;
+  }
+
+  function lockButton(key, label) {
+    return function () {
+      if (!track) return;
+      var m = pickMode(key, false);
+      if (m === null) { addLog(label, 'このカメラには固定の選択肢がありません'); updateReport(); return; }
+      locks[key] = m;
+      applyLocks(label + '（' + m + '）').then(function (ok) { if (!ok) delete locks[key]; });
+    };
+  }
+
+  function unlockAll() {
+    if (!track) return;
+    locks = {};
+    var caps = getCaps();
+    ['whiteBalanceMode', 'exposureMode', 'focusMode'].forEach(function (k) {
+      var m = pickMode(k, true); if (m && (k in caps)) locks[k] = m;
+    });
+    applyLocks('自動に戻す').then(function () { locks = {}; });
+  }
+
+  // ---- live measurement ----
+  var sc = document.createElement('canvas'); sc.width = 64; sc.height = 64;
+  var sctx = sc.getContext('2d', { willReadFrequently: true });
+  function sample() {
+    if (!track || video.readyState < 2) return;
+    try {
+      sctx.drawImage(video, 0, 0, 64, 64);
+      var d = sctx.getImageData(0, 0, 64, 64).data, r = 0, g = 0, b = 0, n = d.length / 4;
+      for (var i = 0; i < d.length; i += 4) { r += d[i]; g += d[i + 1]; b += d[i + 2]; }
+      r /= n; g /= n; b /= n;
+      var L = 0.2126 * r + 0.7152 * g + 0.0722 * b;
+      hist.push({ t: now(), L: L, R: r, G: g, B: b });
+      if (hist.length > 1200) hist.shift();
+      $('nL').textContent = Math.round(L); $('nR').textContent = Math.round(r);
+      $('nG').textContent = Math.round(g); $('nB').textContent = Math.round(b);
+      drawChart();
+      if (hist.length % 8 === 0) updateReport();
+    } catch (e) {}
+  }
+
+  var chart = $('chart'), cctx = chart.getContext('2d');
+  function sizeChart() {
+    var dpr = window.devicePixelRatio || 1, w = chart.clientWidth, h = chart.clientHeight;
+    if (!w) return;
+    chart.width = Math.round(w * dpr); chart.height = Math.round(h * dpr);
+    cctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    drawChart();
+  }
+  function drawChart() {
+    var w = chart.clientWidth, h = chart.clientHeight; if (!w) return;
+    if (chart.width !== Math.round(w * (window.devicePixelRatio || 1))) { sizeChart(); return; }
+    cctx.clearRect(0, 0, w, h);
+    var tEnd = now(), span = 60, tStart = tEnd - span;
+    var x = function (t) { return (t - tStart) / span * w; };
+    var y = function (v) { return h - 4 - (v / 255) * (h - 8); };
+    cctx.strokeStyle = '#e3e7ee'; cctx.lineWidth = 1;
+    [0, 128, 255].forEach(function (v) { cctx.beginPath(); cctx.moveTo(0, y(v)); cctx.lineTo(w, y(v)); cctx.stroke(); });
+    cctx.setLineDash([4, 4]); cctx.strokeStyle = '#9a6700'; cctx.fillStyle = '#9a6700'; cctx.font = '11px sans-serif';
+    marks.forEach(function (m) {
+      if (m.t < tStart) return;
+      cctx.beginPath(); cctx.moveTo(x(m.t), 0); cctx.lineTo(x(m.t), h); cctx.stroke();
+      cctx.fillText(m.label.slice(0, 8), Math.min(x(m.t) + 3, w - 60), 12);
+    });
+    cctx.setLineDash([]);
+    cctx.strokeStyle = '#0b6bcb'; cctx.lineWidth = 2; cctx.beginPath();
+    var started = false;
+    hist.forEach(function (p) {
+      if (p.t < tStart) return;
+      if (!started) { cctx.moveTo(x(p.t), y(p.L)); started = true; } else cctx.lineTo(x(p.t), y(p.L));
+    });
+    cctx.stroke();
+  }
+
+  // ---- report ----
+  function updateReport() {
+    var sup = getSupported(), supKeys = KEYS.map(function (k) { return k[0]; }).filter(function (k) { return sup[k]; });
+    var cams = Array.prototype.map.call($('cam').options, function (o) { return (o.selected ? '* ' : '  ') + o.textContent; });
+    var series = hist.filter(function (p, i) { return i % 4 === 0; })   // one per second
+      .map(function (p) { return Math.round(p.t) + ':' + Math.round(p.L) + '/' + Math.round(p.R) + '/' + Math.round(p.G) + '/' + Math.round(p.B); });
+    var lines = [
+      '=== カメラ固定テスト結果 ===',
+      'ブラウザ: ' + navigator.userAgent,
+      '安全な接続: ' + window.isSecureContext,
+      '名前だけ対応している項目: ' + (supKeys.join(', ') || 'なし'),
+      'カメラ一覧:', cams.join('\n') || '  （取得できず）',
+      '選べる値: ' + JSON.stringify(getCaps()),
+      '今の値: ' + JSON.stringify(getSettings()),
+      '操作の記録:'
+    ].concat(applyLog.map(function (a) { return '  ' + a.t + '秒 ' + a.label + ' → ' + a.result; }))
+     .concat(['印: ' + marks.map(function (m) { return m.t + '秒=' + m.label; }).join(', '),
+              '毎秒の値（秒:明るさ/赤/緑/青）:', series.join(' ')]);
+    $('report').value = lines.join('\n');
+  }
+
+  $('start').addEventListener('click', function () { start($('cam').value || null); });
+  $('cam').addEventListener('change', function () { start($('cam').value); });
+  $('lockWB').addEventListener('click', lockButton('whiteBalanceMode', '色を固定'));
+  $('lockEX').addEventListener('click', lockButton('exposureMode', '明るさを固定'));
+  $('lockFO').addEventListener('click', lockButton('focusMode', 'ピントを固定'));
+  $('unlock').addEventListener('click', unlockAll);
+  $('copy').addEventListener('click', function () {
+    updateReport();
+    var ta = $('report');
+    var done = function () { show($('copyMsg'), 'コピーしました。チャットに貼り付けてください。'); };
+    var manual = function () { ta.focus(); ta.select(); show($('copyMsg'), '自動でコピーできませんでした。下の文字を全部選んでコピーしてください。'); };
+    if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(ta.value).then(done, manual);
+    else manual();
+  });
+  window.addEventListener('resize', sizeChart);
+})();
+</script>
+</body>
+</html>

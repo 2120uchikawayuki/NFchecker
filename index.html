@@ -27,7 +27,8 @@
            background:#0c0f12; color:var(--ink); }
   #stage { position:sticky; top:0; z-index:5; background:var(--bg); padding-top:8px; }
   #view { position:relative; width:min(100%, 44vh); aspect-ratio:1 / 1; margin:0 auto; overflow:hidden; border-radius:10px; background:#000; }
-  #view video { position:absolute; left:0; top:0; width:100%; height:auto; max-width:none; transition:width .35s, left .35s, top .35s; }
+  #view video { position:absolute; left:0; top:0; width:100%; height:auto; max-width:none; }
+  #zoomBtn { padding:8px 12px; font-size:14px; margin:6px 0 0; }
   #view img { position:absolute; left:0; top:0; width:100%; height:100%; object-fit:cover; }
   #clock { font-size:20px; font-weight:700; text-align:center; padding:6px 0 4px; font-variant-numeric:tabular-nums; }
   .msg { font-size:14px; padding:8px 10px; border-radius:8px; background:#3a2c0d; color:#f3d48a; margin:8px 0 0; }
@@ -52,7 +53,7 @@
 </head>
 <body>
 <main>
-  <h1>海苔 蛍光チェッカー <span class="small">試作 0.2</span></h1>
+  <h1>海苔 蛍光チェッカー <span class="small">試作 0.3</span></h1>
   <p class="small">色の自動調整を止めて録画し、色の変化を数字にします。映像と数字はこのスマホの中だけにあり、保存するまでどこにも送られません。</p>
 
   <div id="stage" hidden>
@@ -60,6 +61,8 @@
       <video id="video" playsinline muted autoplay></video>
       <img id="still" alt="" hidden>
     </div>
+    <button id="zoomBtn" class="sub">視野を拡大する</button>
+    <div id="zoomMsg" class="msg" hidden></div>
     <div id="clock" hidden></div>
   </div>
 
@@ -84,7 +87,7 @@
 
   <section id="cRec" hidden>
     <h2>3. 顕微鏡に合わせて、録画を始める</h2>
-    <p class="small">酸をかける前の海苔にピントを合わせてから始めます。上の映像は、光っている視野のところだけを大きく映しています。滴下の時刻は、撮り終えたあとに映像を見ながら決めます。</p>
+    <p class="small">酸をかける前の海苔にピントを合わせてから始めます。映像は勝手には動きません。大きく見たいときだけ、映像の下の「視野を拡大する」を押してください。滴下の時刻は、撮り終えたあとに映像を見ながら決めます。</p>
     <input id="memo" type="text" placeholder="メモ（海苔や液の名前など。あとでファイル名になります）" autocomplete="off">
     <button id="rec" class="go" style="margin-top:8px">録画と計測を始める</button>
     <div id="recMsg" class="msg" hidden></div>
@@ -158,7 +161,8 @@
   var rec = null, chunks = [], recBlob = null, recMime = '';
   var rows = [], tRec0 = 0, tDrop = null, tOut = null, tCand = null, startedAt = null, recArmed = false;
   var sampler = null, wake = null, tick = 0, cur = 0;
-  var box = null;                     // lit field in video pixels: {cx, cy, half}
+  var box = null, zoomed = false;     // the enlarged view: fixed when the button is pressed, never moves by itself
+  var snapBox = null, lastOk = null;  // area kept in the review pictures; last good measurement
   var SINGLE_BACK = ['背面カメラ', 'Back Camera'];
 
   // ---------- small helpers ----------
@@ -188,7 +192,8 @@
     $('charts').hidden = (s !== 'rec' && s !== 'done');
     $('cDone').hidden = (s !== 'done');
     $('clock').hidden = (s !== 'rec');
-    video.hidden = (s === 'done'); $('still').hidden = (s !== 'done');
+    video.hidden = (s === 'done'); $('still').hidden = (s !== 'done'); $('zoomBtn').hidden = (s === 'done' || s === 'idle');
+    applyView();
     $('liveTitle').textContent = (s === 'rec') ? '計測中' : (s === 'done' ? 'つまみの位置の数字' : 'いま映っているものの数字');
     if (s === 'rec' || s === 'done') sizeCharts();
   }
@@ -237,7 +242,7 @@
     }
     if (deviceId) { try { localStorage.setItem('camId', deviceId); } catch (e) {} }
     // a new camera starts in automatic colour: any earlier lock no longer holds
-    wbLocked = false; whiteRef = null; lockLost = false; box = null;
+    wbLocked = false; whiteRef = null; lockLost = false; box = null; zoomed = false; lastOk = null;
     $('start').textContent = 'カメラを起動し直す'; $('start').className = 'sub';
     setState('ready');
     renderLock(); applyView();
@@ -391,32 +396,41 @@
              yellow: 100 * yel / field, dark: 100 * dark / field, clip: 100 * clip / field };
   }
 
-  // ---------- the enlarged view of the lit field ----------
-  function viewBox() {
+  // ---------- the view: whole picture by default, enlarged only on request ----------
+  function fieldBox(m) {
+    var vw = video.videoWidth, vh = video.videoHeight;
+    return { cx: m.cx * vw, cy: m.cy * vh, half: 1.12 * Math.sqrt(m.field * vw * vh / Math.PI) };
+  }
+  function clampBox(b) {
     var vw = video.videoWidth, vh = video.videoHeight, mn = Math.min(vw, vh);
-    var b = box || { cx: vw / 2, cy: vh / 2, half: mn / 2 };
+    if (!b) b = { cx: vw / 2, cy: vh / 2, half: mn / 2 };
     var half = Math.max(mn * 0.12, Math.min(mn / 2, b.half));
     return { cx: Math.max(half, Math.min(vw - half, b.cx)), cy: Math.max(half, Math.min(vh - half, b.cy)), half: half };
   }
   function applyView() {
-    var vw = video.videoWidth; if (!vw) return;
-    var b = viewBox(), side = 2 * b.half;
-    video.style.width = (vw / side * 100) + '%';
-    video.style.left = (-(b.cx - b.half) / side * 100) + '%';
-    video.style.top = (-(b.cy - b.half) / side * 100) + '%';
+    var vw = video.videoWidth, vh = video.videoHeight, v = $('view');
+    if (!vw || !vh) return;
+    if (state === 'done') { v.style.aspectRatio = '1 / 1'; v.style.width = 'min(100%, 44vh)'; return; }
+    if (zoomed && box) {
+      var b = clampBox(box), side = 2 * b.half;
+      v.style.aspectRatio = '1 / 1'; v.style.width = 'min(100%, 44vh)';
+      video.style.width = (vw / side * 100) + '%';
+      video.style.left = (-(b.cx - b.half) / side * 100) + '%';
+      video.style.top = (-(b.cy - b.half) / side * 100) + '%';
+    } else {
+      v.style.aspectRatio = vw + ' / ' + vh; v.style.width = 'min(100%, ' + (44 * vw / vh).toFixed(2) + 'vh)';
+      video.style.width = '100%'; video.style.left = '0'; video.style.top = '0';
+    }
+    $('zoomBtn').textContent = zoomed ? '全体に戻す' : '視野を拡大する';
   }
-  function followField(m) {
-    var vw = video.videoWidth, vh = video.videoHeight;
-    var t = { cx: m.cx * vw, cy: m.cy * vh, half: 1.12 * Math.sqrt(m.field * vw * vh / Math.PI) };
-    if (!box) { box = t; applyView(); return; }
-    var k = (state === 'rec') ? 0.08 : 0.3;          // move slowly while recording so the picture stays steady
-    var nb = { cx: box.cx + k * (t.cx - box.cx), cy: box.cy + k * (t.cy - box.cy), half: box.half + k * (t.half - box.half) };
-    var moved = Math.abs(nb.cx - box.cx) + Math.abs(nb.cy - box.cy) + Math.abs(nb.half - box.half);
-    box = nb;
-    if (moved > Math.min(vw, vh) * 0.004) applyView();
+  function toggleZoom() {
+    hide($('zoomMsg'));
+    if (zoomed) { zoomed = false; applyView(); return; }
+    if (!lastOk) { show($('zoomMsg'), '光っている視野が見つかりません。顕微鏡に合わせてから押してください。'); return; }
+    box = fieldBox(lastOk); zoomed = true; applyView();
   }
   function takeSnap(row) {
-    var b = viewBox();
+    var b = snapBox || clampBox(null);
     try {
       snapX.drawImage(video, b.cx - b.half, b.cy - b.half, 2 * b.half, 2 * b.half, 0, 0, SN, SN);
       if (snapC.toBlob) snapC.toBlob(function (bl) { if (bl) row.snap = URL.createObjectURL(bl); }, 'image/jpeg', 0.72);
@@ -441,7 +455,7 @@
     if (state === 'ready' && tick % 2) return;          // 2 per second while just looking
     var m; try { m = analyze(); } catch (e) { return; }
     if (!m) return;
-    if (m.ok) followField(m);
+    if (m.ok) lastOk = m;
     showNums(m);
     if (state === 'rec') {
       var row = { t: (performance.now() - tRec0) / 1000, m: m, snap: null };
@@ -537,6 +551,7 @@
         rec.start(1000);
       } catch (e) { rec = null; }
     }
+    snapBox = (zoomed && box) ? clampBox(box) : clampBox(lastOk ? fieldBox(lastOk) : null);   // fixed for the whole run
     startedAt = new Date(); tRec0 = performance.now();
     setState('rec');
     if (!rec) show($('runMsg'), 'このブラウザでは動画を残せません。数字だけ記録します。');
@@ -693,6 +708,7 @@
   $('unlock').addEventListener('click', unlockWB);
   $('rec').addEventListener('click', startRec);
   $('stop').addEventListener('click', stopRec);
+  $('zoomBtn').addEventListener('click', toggleZoom);
   $('seek').addEventListener('input', function () { goTo(parseInt($('seek').value, 10) || 0); });
   [['b-4', -4], ['b-1', -1], ['b1', 1], ['b4', 4]].forEach(function (p) { $(p[0]).addEventListener('click', function () { goTo(cur + p[1]); }); });
   $('jump').addEventListener('click', function () { if (tCand !== null) goTo(indexAt(tCand)); });

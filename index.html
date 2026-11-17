@@ -67,6 +67,7 @@
     <button id="lockEX">明るさ（露出）を固定</button>
     <button id="lockFO">ピントを固定</button>
     <button id="unlock" class="sub">ぜんぶ自動に戻す</button>
+    <p id="state" class="msg" style="background:#eef5ff;color:#0b3d73"></p>
     <ol id="log"></ol>
   </section>
 
@@ -155,14 +156,14 @@
       return;
     }
     track = stream.getVideoTracks()[0];
-    locks = {};
     video.srcObject = stream; video.hidden = false;
     try { await video.play(); } catch (e) {}
     await listCams();
     ['s2', 's3', 's4', 's5'].forEach(function (id) { $(id).hidden = false; });
-    $('start').textContent = 'カメラを起動し直す';
+    $('start').textContent = 'カメラを起動し直す'; $('start').className = 'sub';
     marks.push({ t: now(), label: '起動' });
     renderCaps();
+    if (Object.keys(locks).length) await applyLocks('固定をかけ直す');
     if (!sampler) sampler = setInterval(sample, 250);
     sizeChart();
     updateReport();
@@ -196,6 +197,12 @@
       });
       tb.appendChild(tr);
     });
+    renderState();
+  }
+
+  function renderState() {
+    var wb = getSettings().whiteBalanceMode;
+    $('state').textContent = '今の色の調整： ' + (wb === 'manual' ? '固定中' : wb === 'continuous' ? '自動' : '不明');
   }
 
   function pickMode(key, wantAuto) {
@@ -234,6 +241,8 @@
   function lockButton(key, label) {
     return function () {
       if (!track) return;
+      var caps = getCaps();
+      if (Object.keys(caps).length && !(key in caps)) { addLog(label, 'この項目はこのブラウザにありません（固定できません）'); updateReport(); return; }
       var m = pickMode(key, false);
       if (m === null) { addLog(label, 'このカメラには固定の選択肢がありません'); updateReport(); return; }
       locks[key] = m;
@@ -267,7 +276,7 @@
       $('nL').textContent = Math.round(L); $('nR').textContent = Math.round(r);
       $('nG').textContent = Math.round(g); $('nB').textContent = Math.round(b);
       drawChart();
-      if (hist.length % 8 === 0) updateReport();
+      if (hist.length % 8 === 0) { updateReport(); renderState(); }
     } catch (e) {}
   }
 

@@ -3,147 +3,173 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>カメラ固定テスト</title>
+<title>海苔 蛍光チェッカー（試作）</title>
 <style>
-  :root { --ink:#1d2433; --sub:#5b6474; --line:#d9dee7; --bg:#f6f7f9; --card:#fff; --accent:#0b6bcb; --ok:#14804a; --ng:#b3261e; --warn:#9a6700; }
+  :root { --bg:#101317; --card:#1a1f25; --line:#2d353f; --ink:#e9ecf0; --sub:#9ba6b3;
+          --accent:#4c9cf0; --go:#2e9e68; --stop:#d5534e; --warn:#e3a53c; --mark:#f0c04c; }
   * { box-sizing:border-box; }
-  body { margin:0; padding:16px 14px 48px; background:var(--bg); color:var(--ink);
+  body { margin:0; padding:0 12px 56px; background:var(--bg); color:var(--ink);
          font-family:"Hiragino Sans","Hiragino Kaku Gothic ProN","Noto Sans JP","Yu Gothic",sans-serif;
-         font-size:16px; line-height:1.7; }
+         font-size:16px; line-height:1.65; -webkit-text-size-adjust:100%; }
   main { max-width:640px; margin:0 auto; }
-  h1 { font-size:22px; margin:4px 0 6px; }
-  h2 { font-size:17px; margin:0 0 8px; }
-  p { margin:0 0 10px; }
-  .lead { color:var(--sub); font-size:14px; }
-  section { background:var(--card); border:1px solid var(--line); border-radius:12px; padding:14px; margin:14px 0; }
-  button { font:inherit; font-weight:600; padding:12px 14px; border-radius:10px; border:1px solid var(--accent);
-           background:var(--accent); color:#fff; width:100%; margin:4px 0; }
-  button.sub { background:#fff; color:var(--accent); }
-  button:disabled { opacity:.4; }
-  select, textarea { font:inherit; width:100%; padding:10px; border-radius:10px; border:1px solid var(--line); background:#fff; color:var(--ink); }
-  video { width:100%; max-height:46vh; background:#000; border-radius:10px; margin-top:8px; display:block; object-fit:contain; }
-  table { width:100%; border-collapse:collapse; font-size:14px; }
-  th, td { text-align:left; padding:6px 4px; border-bottom:1px solid var(--line); vertical-align:top; word-break:break-word; }
-  th { color:var(--sub); font-weight:600; font-size:12px; }
-  .ok { color:var(--ok); font-weight:700; } .ng { color:var(--ng); font-weight:700; } .warn { color:var(--warn); font-weight:700; }
-  .msg { font-size:14px; padding:8px 10px; border-radius:8px; background:#fff4e5; color:#7a4b00; margin-top:8px; }
-  .nums { display:grid; grid-template-columns:repeat(4,1fr); gap:6px; margin:8px 0; }
-  .nums div { border:1px solid var(--line); border-radius:8px; padding:6px 4px; text-align:center; }
-  .nums b { display:block; font-size:20px; font-variant-numeric:tabular-nums; }
-  .nums span { font-size:12px; color:var(--sub); }
-  canvas#chart { width:100%; height:140px; border:1px solid var(--line); border-radius:8px; display:block; }
-  #log { font-size:14px; margin:8px 0 0; padding-left:18px; }
-  #log li { margin-bottom:4px; }
-  textarea { height:160px; font-size:12px; font-family:ui-monospace,Menlo,monospace; }
+  h1 { font-size:19px; margin:12px 0 2px; }
+  h2 { font-size:16px; margin:0 0 8px; }
+  p { margin:0 0 8px; }
   .small { font-size:13px; color:var(--sub); }
+  section { background:var(--card); border:1px solid var(--line); border-radius:12px; padding:12px; margin:12px 0; }
+  button { font:inherit; font-weight:700; padding:13px 12px; border-radius:10px; border:1px solid var(--accent);
+           background:var(--accent); color:#06121f; width:100%; margin:4px 0; }
+  button.sub { background:transparent; color:var(--accent); }
+  button.go { background:var(--go); border-color:var(--go); color:#04140c; }
+  button.stop { background:var(--stop); border-color:var(--stop); color:#fff; }
+  button.mark { background:var(--mark); border-color:var(--mark); color:#231a02; font-size:18px; padding:18px 12px; }
+  button.done { opacity:.75; }
+  select, input[type=text], textarea { font:inherit; width:100%; padding:10px; border-radius:10px; border:1px solid var(--line);
+           background:#0c0f12; color:var(--ink); }
+  #stage { position:sticky; top:0; z-index:5; background:var(--bg); padding-top:8px; }
+  video { width:100%; max-height:36vh; background:#000; border-radius:10px; display:block; object-fit:contain; }
+  #clock { font-size:22px; font-weight:700; text-align:center; padding:6px 0 4px; font-variant-numeric:tabular-nums; }
+  #clock small { font-size:13px; font-weight:400; color:var(--sub); display:block; }
+  .msg { font-size:14px; padding:8px 10px; border-radius:8px; background:#3a2c0d; color:#f3d48a; margin:8px 0 0; }
+  .state { font-size:14px; padding:8px 10px; border-radius:8px; background:#0f2337; color:#a9d0f7; margin:8px 0 0; }
+  .state.ok { background:#0f2b1e; color:#9fe0bd; }
+  .nums { display:grid; grid-template-columns:repeat(4,1fr); gap:6px; margin:4px 0 8px; }
+  .nums div { border:1px solid var(--line); border-radius:8px; padding:6px 2px; text-align:center; }
+  .nums b { display:block; font-size:19px; font-variant-numeric:tabular-nums; }
+  .nums span { font-size:11px; color:var(--sub); }
+  canvas.chart { width:100%; height:110px; border:1px solid var(--line); border-radius:8px; display:block; background:#0c0f12; }
+  .cap { font-size:12px; color:var(--sub); margin:8px 0 3px; }
+  .row2 { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+  textarea { height:130px; font-size:12px; font-family:ui-monospace,Menlo,monospace; margin-top:8px; }
+  ul.sum { margin:0 0 8px; padding-left:20px; font-size:15px; }
+  a { color:var(--accent); }
   [hidden] { display:none !important; }
 </style>
 </head>
 <body>
 <main>
-  <h1>カメラ固定テスト</h1>
-  <p class="lead">このスマホのブラウザで、カメラの「明るさ」と「色」の自動調整を止められるかを調べます。映像はこのスマホの中だけで使い、どこにも送りません。</p>
+  <h1>海苔 蛍光チェッカー <span class="small">試作 0.1</span></h1>
+  <p class="small">色の自動調整を止めて録画し、色の変化を数字にします。映像と数字はこのスマホの中だけにあり、保存するまでどこにも送られません。</p>
 
-  <section>
+  <div id="stage" hidden>
+    <video id="video" playsinline muted autoplay></video>
+    <div id="clock" hidden></div>
+  </div>
+
+  <section id="cStart">
     <h2>1. カメラを起動する</h2>
     <button id="start">カメラを起動する</button>
     <div id="camWrap" hidden>
-      <p class="small" style="margin-top:8px">使うカメラ（レンズが勝手に切り替わらないよう、最初から「背面カメラ」だけを使います。選び直したカメラは次回も覚えています）</p>
+      <p class="small" style="margin-top:8px">使うカメラ（レンズが勝手に替わらないよう「背面カメラ」だけを使います）</p>
       <select id="cam"></select>
     </div>
-    <video id="video" playsinline muted autoplay hidden></video>
     <div id="startMsg" class="msg" hidden></div>
   </section>
 
-  <section id="s2" hidden>
-    <h2>2. このカメラで選べる項目</h2>
-    <table id="caps"><thead><tr><th>項目</th><th>対応</th><th>選べる値</th><th>今の値</th></tr></thead><tbody></tbody></table>
-    <p class="small" style="margin-top:8px">○＝切り替えられる　△＝名前だけ対応　×＝対応なし</p>
+  <section id="cLock" hidden>
+    <h2>2. 白い紙で色を固定する</h2>
+    <p class="small">白い紙にカメラを向けて、画面いっぱいに映してから押してください。毎回、同じ紙と同じ明かりで行うと、日をまたいでも比べやすくなります。</p>
+    <button id="lock">色を固定する</button>
+    <button id="unlock" class="sub" hidden>固定をやめる（自動に戻す）</button>
+    <div id="lockState" class="state"></div>
+    <div id="lockMsg" class="msg" hidden></div>
   </section>
 
-  <section id="s3" hidden>
-    <h2>3. 固定を試す</h2>
-    <button id="lockWB">色（ホワイトバランス）を固定</button>
-    <button id="lockEX">明るさ（露出）を固定</button>
-    <button id="lockFO">ピントを固定</button>
-    <button id="unlock" class="sub">ぜんぶ自動に戻す</button>
-    <p id="state" class="msg" style="background:#eef5ff;color:#0b3d73"></p>
-    <ol id="log"></ol>
+  <section id="cRec" hidden>
+    <h2>3. 顕微鏡に合わせて、録画を始める</h2>
+    <p class="small">酸をかける前の海苔にピントを合わせてから始めます。</p>
+    <input id="memo" type="text" placeholder="メモ（海苔や液の名前など。あとでファイル名になります）" autocomplete="off">
+    <button id="rec" class="go" style="margin-top:8px">録画と計測を始める</button>
+    <div id="recMsg" class="msg" hidden></div>
   </section>
 
-  <section id="s4" hidden>
-    <h2>4. 本当に止まったか確かめる</h2>
-    <p class="small">カメラを明るい所（窓や照明）と暗い所（机の下など）へ、5秒ずつ交互に向けてください。まず固定する前に一往復、次に「3」で固定してからもう一往復します。<br>
-    自動のままだと、明るさの線はいったん動いたあと真ん中へ戻ろうとします。固定できていれば、明るい所では高いまま、暗い所では低いままになります。</p>
+  <section id="cRun" hidden>
+    <button id="drop" class="mark">滴下した</button>
+    <button id="out" class="mark">目で見て「アウト」</button>
+    <button id="stop" class="stop">終わる</button>
+    <div id="runMsg" class="msg" hidden></div>
+  </section>
+
+  <section id="cLive" hidden>
+    <h2 id="liveTitle">いま映っているものの数字</h2>
     <div class="nums">
-      <div><b id="nL">–</b><span>明るさ</span></div>
-      <div><b id="nR">–</b><span>赤</span></div>
-      <div><b id="nG">–</b><span>緑</span></div>
-      <div><b id="nB">–</b><span>青</span></div>
+      <div><b id="nHue">–</b><span>色あい</span></div>
+      <div><b id="nL">–</b><span>明るさ(参考)</span></div>
+      <div><b id="nY">–</b><span>明るい粒 %</span></div>
+      <div><b id="nD">–</b><span>黒い点 %</span></div>
     </div>
-    <canvas id="chart"></canvas>
-    <p class="small" style="margin-top:6px">線は直近60秒の明るさ。縦の点線は「固定」や「自動に戻す」を押した時点です。</p>
+    <p class="small" id="fieldNote"></p>
+    <div id="charts" hidden>
+      <p class="cap">色あい（0＝赤、30＝橙、60＝黄。上へ行くほど黄色寄り）</p>
+      <canvas id="chHue" class="chart"></canvas>
+      <p class="cap">明るい粒（まわりより1割以上明るい細かい点）が占める広さ（%）</p>
+      <canvas id="chY" class="chart"></canvas>
+      <p class="cap">明るさ（参考。カメラの自動調整が入ります）</p>
+      <canvas id="chL" class="chart"></canvas>
+    </div>
   </section>
 
-  <section id="s5" hidden>
-    <h2>5. 結果を送る</h2>
-    <p class="small">「4」の往復が終わったら、下のボタンで結果をコピーして、Claudeとのチャットに貼り付けてください。</p>
-    <button id="copy">結果をコピーする</button>
+  <section id="cDone" hidden>
+    <h2>4. 保存する</h2>
+    <ul class="sum" id="summary"></ul>
+    <button id="saveVideo">動画を保存する</button>
+    <button id="saveCsv">数字の表（CSV）を保存する</button>
+    <button id="copy" class="sub">結果を文字でコピーする</button>
     <div id="copyMsg" class="msg" hidden></div>
     <textarea id="report" readonly></textarea>
+    <button id="next" class="go" style="margin-top:10px">次の試料へ（色の固定はそのまま）</button>
   </section>
+
+  <p class="small" style="margin-top:18px">カメラの固定を調べるページは <a href="test.html">こちら</a>。</p>
 </main>
 
 <script>
 (function () {
+  'use strict';
   var $ = function (id) { return document.getElementById(id); };
   var video = $('video');
   var stream = null, track = null;
-  var applyLog = [];           // {t, label, result}
-  var hist = [];               // {t, L, R, G, B}
-  var marks = [];              // {t, label}
-  var t0 = Date.now();
-  var locks = {};              // key -> value currently requested
-  var sampler = null;
+  var state = 'idle';                 // idle / ready / rec / done
+  var wbLocked = false, whiteRef = null, lockLost = false;
+  var rec = null, chunks = [], recBlob = null, recMime = '';
+  var rows = [], marks = [], tRec0 = 0, tDrop = null, tOut = null, startedAt = null, recArmed = false;
+  var sampler = null, wake = null, tick = 0;
+  var SINGLE_BACK = ['背面カメラ', 'Back Camera'];
 
-  var KEYS = [
-    ['whiteBalanceMode', '色の調整（ホワイトバランス）'],
-    ['colorTemperature', '色温度'],
-    ['exposureMode', '明るさの調整（露出）'],
-    ['exposureTime', '露出時間'],
-    ['exposureCompensation', '露出補正'],
-    ['iso', '感度（ISO）'],
-    ['focusMode', 'ピントの調整'],
-    ['focusDistance', 'ピント位置'],
-    ['zoom', 'ズーム'],
-    ['torch', 'ライト'],
-    ['frameRate', 'コマ数']
-  ];
-
-  function now() { return Math.round((Date.now() - t0) / 100) / 10; }
+  // ---------- small helpers ----------
   function show(el, text) { el.textContent = text; el.hidden = false; }
-  function fmt(v) {
-    if (v === undefined) return '–';
-    if (Array.isArray(v)) return v.join(' / ');
-    if (v && typeof v === 'object') {
-      if ('min' in v || 'max' in v) return v.min + '〜' + v.max + (v.step ? '（刻み' + v.step + '）' : '');
-      return JSON.stringify(v);
-    }
-    return String(v);
-  }
+  function hide(el) { el.hidden = true; }
+  function r1(x) { return Math.round(x * 10) / 10; }
+  function r2(x) { return Math.round(x * 100) / 100; }
   function getCaps() { try { return (track && track.getCapabilities) ? track.getCapabilities() : {}; } catch (e) { return {}; } }
   function getSettings() { try { return track ? track.getSettings() : {}; } catch (e) { return {}; } }
-  function getSupported() { try { return navigator.mediaDevices.getSupportedConstraints(); } catch (e) { return {}; } }
+  function camLabel() { var o = $('cam').selectedOptions && $('cam').selectedOptions[0]; return o ? o.textContent : (track ? track.label : ''); }
 
+  function setState(s) {
+    state = s;
+    $('stage').hidden = (s === 'idle');
+    $('cStart').hidden = (s === 'rec' || s === 'done');
+    $('cLock').hidden = (s !== 'ready');
+    $('cRec').hidden = (s !== 'ready');
+    $('cRun').hidden = (s !== 'rec');
+    $('cLive').hidden = (s === 'idle');
+    $('charts').hidden = (s !== 'rec' && s !== 'done');
+    $('cDone').hidden = (s !== 'done');
+    $('clock').hidden = (s !== 'rec' && s !== 'done');
+    $('liveTitle').textContent = (s === 'rec') ? '計測中' : (s === 'done' ? '計測の結果' : 'いま映っているものの数字');
+    if (s === 'rec' || s === 'done') sizeCharts();
+  }
+
+  // ---------- camera ----------
   function stopStream() {
     if (stream) stream.getTracks().forEach(function (t) { t.stop(); });
     stream = null; track = null;
   }
 
   async function start(deviceId) {
-    $('startMsg').hidden = true;
+    hide($('startMsg'));
     if (!window.isSecureContext || !navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-      show($('startMsg'), 'このページではカメラを使えません。アドレスが https:// で始まる場所に置いて、SafariかChromeで開いてください。');
+      show($('startMsg'), 'このページではカメラを使えません。アドレスが https:// で始まる場所に置いて、Safariで開いてください。');
       return;
     }
     stopStream();
@@ -152,14 +178,14 @@
     var chosen = deviceId || saved;
     var want = function (id) {
       var v = id ? { deviceId: { exact: id } } : { facingMode: { ideal: 'environment' } };
-      v.width = { ideal: 1280 }; v.height = { ideal: 720 };
+      v.width = { ideal: 1280 }; v.height = { ideal: 720 }; v.frameRate = { ideal: 30 };
       return { video: v, audio: false };
     };
     try {
       stream = await navigator.mediaDevices.getUserMedia(want(chosen));
     } catch (e) {
       var failed = e;
-      if (saved && !deviceId) {          // remembered camera is gone: fall back to the default one
+      if (saved && !deviceId) {
         chosen = null;
         try { stream = await navigator.mediaDevices.getUserMedia(want(null)); failed = null; } catch (e2) { failed = e2; }
       }
@@ -169,22 +195,20 @@
       }
     }
     track = stream.getVideoTracks()[0];
-    video.srcObject = stream; video.hidden = false;
+    video.srcObject = stream;
     try { await video.play(); } catch (e) {}
     await listCams();
-    if (!chosen) {                       // first start: move to the single back lens so lenses do not swap
+    if (!chosen) {
       var single = findSingleBack();
       if (single && single !== getSettings().deviceId) return start(single);
     }
     if (deviceId) { try { localStorage.setItem('camId', deviceId); } catch (e) {} }
-    ['s2', 's3', 's4', 's5'].forEach(function (id) { $(id).hidden = false; });
+    // a new camera starts in automatic colour: any earlier lock no longer holds
+    wbLocked = false; whiteRef = null; lockLost = false;
     $('start').textContent = 'カメラを起動し直す'; $('start').className = 'sub';
-    marks.push({ t: now(), label: '起動' });
-    renderCaps();
-    if (Object.keys(locks).length) await applyLocks('固定をかけ直す');
+    setState('ready');
+    renderLock();
     if (!sampler) sampler = setInterval(sample, 250);
-    sizeChart();
-    updateReport();
   }
 
   async function listCams() {
@@ -201,179 +225,387 @@
       $('camWrap').hidden = devs.length < 2;
     } catch (e) {}
   }
-
-  var SINGLE_BACK = ['背面カメラ', 'Back Camera'];
   function findSingleBack() {
     var opts = $('cam').options;
     for (var i = 0; i < opts.length; i++) if (SINGLE_BACK.indexOf(opts[i].textContent) >= 0) return opts[i].value;
     return null;
   }
 
-  function renderCaps() {
-    var caps = getCaps(), st = getSettings(), sup = getSupported();
-    var tb = $('caps').querySelector('tbody'); tb.innerHTML = '';
-    KEYS.forEach(function (k) {
-      var tr = document.createElement('tr');
-      var mark = (k[0] in caps) ? ['○', 'ok'] : (sup[k[0]] ? ['△', 'warn'] : ['×', 'ng']);
-      [k[1], mark[0], fmt(caps[k[0]]), fmt(st[k[0]])].forEach(function (text, i) {
-        var td = document.createElement('td'); td.textContent = text;
-        if (i === 1) td.className = mark[1];
-        tr.appendChild(td);
-      });
-      tb.appendChild(tr);
-    });
-    renderState();
-  }
-
-  function renderState() {
-    var wb = getSettings().whiteBalanceMode;
-    $('state').textContent = '今の色の調整： ' + (wb === 'manual' ? '固定中' : wb === 'continuous' ? '自動' : '不明');
-  }
-
-  function pickMode(key, wantAuto) {
-    var list = getCaps()[key];
-    var order = wantAuto ? ['continuous'] : ['manual', 'none', 'single-shot'];
-    if (Array.isArray(list)) {
-      for (var i = 0; i < order.length; i++) if (list.indexOf(order[i]) >= 0) return order[i];
-      return null;
+  // ---------- colour lock ----------
+  function renderLock() {
+    var el = $('lockState');
+    if (wbLocked) {
+      el.className = 'state ok';
+      el.textContent = '色の調整： 固定中' + (whiteRef ? '（白い紙の色　赤' + whiteRef[0] + '・緑' + whiteRef[1] + '・青' + whiteRef[2] + '）' : '');
+    } else {
+      el.className = 'state';
+      el.textContent = '色の調整： 自動（まだ固定していません）';
     }
-    return order[0];   // not reported: try anyway
+    $('lock').textContent = wbLocked ? '白い紙で固定し直す' : '色を固定する';
+    $('lock').className = wbLocked ? 'sub' : '';
+    $('unlock').hidden = !wbLocked;
   }
 
-  function addLog(label, result) {
-    var t = now();
-    applyLog.push({ t: t, label: label, result: result });
-    var li = document.createElement('li'); li.textContent = label + ' → ' + result; $('log').appendChild(li);
-    return t;
+  async function setWB(mode) {
+    await track.applyConstraints({ advanced: [{ whiteBalanceMode: mode }] });
   }
 
-  async function applyLocks(label) {
-    var sets = Object.keys(locks).map(function (k) { var o = {}; o[k] = locks[k]; return o; });
-    var result, ok = true;
-    try {
-      await track.applyConstraints(sets.length ? { advanced: sets } : {});
-      var st = getSettings();
-      result = '受け付けられました。今の値： ' + ['whiteBalanceMode', 'exposureMode', 'focusMode'].map(function (k) { return k + '=' + fmt(st[k]); }).join(', ');
-    } catch (e) {
-      ok = false;
-      result = '断られました（' + e.name + (e.message ? ': ' + e.message : '') + '）';
-    }
-    marks.push({ t: addLog(label, result), label: label });
-    renderCaps(); updateReport();
-    return ok;
-  }
-
-  function lockButton(key, label) {
-    return function () {
-      if (!track) return;
-      var caps = getCaps();
-      if (Object.keys(caps).length && !(key in caps)) { addLog(label, 'この項目はこのブラウザにありません（固定できません）'); updateReport(); return; }
-      var m = pickMode(key, false);
-      if (m === null) { addLog(label, 'このカメラには固定の選択肢がありません'); updateReport(); return; }
-      locks[key] = m;
-      applyLocks(label + '（' + m + '）').then(function (ok) { if (!ok) delete locks[key]; });
-    };
-  }
-
-  function unlockAll() {
+  async function lockWB() {
+    hide($('lockMsg'));
     if (!track) return;
-    locks = {};
-    var caps = getCaps();
-    ['whiteBalanceMode', 'exposureMode', 'focusMode'].forEach(function (k) {
-      var m = pickMode(k, true); if (m && (k in caps)) locks[k] = m;
-    });
-    applyLocks('自動に戻す').then(function () { locks = {}; });
-  }
-
-  // ---- live measurement ----
-  var sc = document.createElement('canvas'); sc.width = 64; sc.height = 64;
-  var sctx = sc.getContext('2d', { willReadFrequently: true });
-  function sample() {
-    if (!track || video.readyState < 2) return;
+    var list = getCaps().whiteBalanceMode;
+    if (!Array.isArray(list) || list.indexOf('manual') < 0) {
+      show($('lockMsg'), 'このブラウザでは色を固定できません。iPhoneのSafariで開いてください。固定なしでも録画はできますが、色の数字は当てになりません。');
+      return;
+    }
     try {
-      sctx.drawImage(video, 0, 0, 64, 64);
-      var d = sctx.getImageData(0, 0, 64, 64).data, r = 0, g = 0, b = 0, n = d.length / 4;
-      for (var i = 0; i < d.length; i += 4) { r += d[i]; g += d[i + 1]; b += d[i + 2]; }
-      r /= n; g /= n; b /= n;
-      var L = 0.2126 * r + 0.7152 * g + 0.0722 * b;
-      hist.push({ t: now(), L: L, R: r, G: g, B: b });
-      if (hist.length > 1200) hist.shift();
-      $('nL').textContent = Math.round(L); $('nR').textContent = Math.round(r);
-      $('nG').textContent = Math.round(g); $('nB').textContent = Math.round(b);
-      drawChart();
-      if (hist.length % 8 === 0) { updateReport(); renderState(); }
-    } catch (e) {}
+      if (wbLocked) { await setWB('continuous'); await new Promise(function (r) { setTimeout(r, 1500); }); }  // let it settle on the paper again
+      await setWB('manual');
+    } catch (e) {
+      show($('lockMsg'), '色を固定できませんでした（' + e.name + '）。');
+      return;
+    }
+    wbLocked = true; lockLost = false; whiteRef = null; renderLock();
+    setTimeout(function () { whiteRef = centerMean(); renderLock(); }, 700);
   }
 
-  var chart = $('chart'), cctx = chart.getContext('2d');
-  function sizeChart() {
-    var dpr = window.devicePixelRatio || 1, w = chart.clientWidth, h = chart.clientHeight;
-    if (!w) return;
-    chart.width = Math.round(w * dpr); chart.height = Math.round(h * dpr);
-    cctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    drawChart();
+  async function unlockWB() {
+    try { await setWB('continuous'); } catch (e) {}
+    wbLocked = false; whiteRef = null; renderLock();
   }
-  function drawChart() {
-    var w = chart.clientWidth, h = chart.clientHeight; if (!w) return;
-    if (chart.width !== Math.round(w * (window.devicePixelRatio || 1))) { sizeChart(); return; }
-    cctx.clearRect(0, 0, w, h);
-    var tEnd = now(), span = 60, tStart = tEnd - span;
-    var x = function (t) { return (t - tStart) / span * w; };
-    var y = function (v) { return h - 4 - (v / 255) * (h - 8); };
-    cctx.strokeStyle = '#e3e7ee'; cctx.lineWidth = 1;
-    [0, 128, 255].forEach(function (v) { cctx.beginPath(); cctx.moveTo(0, y(v)); cctx.lineTo(w, y(v)); cctx.stroke(); });
-    cctx.setLineDash([4, 4]); cctx.strokeStyle = '#9a6700'; cctx.fillStyle = '#9a6700'; cctx.font = '11px sans-serif';
+
+  // ---------- image analysis ----------
+  var A = document.createElement('canvas'), Bc = document.createElement('canvas'), pyr = [];
+  var actx = null, bctx = null, AW = 0, AH = 0;
+
+  function setupCanvases() {
+    var vw = video.videoWidth, vh = video.videoHeight;
+    if (!vw || !vh) return false;
+    var k = 360 / Math.min(vw, vh);
+    var w = Math.round(vw * k), h = Math.round(vh * k);
+    if (w === AW && h === AH) return true;
+    AW = w; AH = h;
+    A.width = AW; A.height = AH; Bc.width = AW; Bc.height = AH;
+    actx = A.getContext('2d', { willReadFrequently: true });
+    bctx = Bc.getContext('2d', { willReadFrequently: true });
+    pyr = [];
+    var pw = AW, ph = AH;
+    while (Math.min(pw, ph) > 24) {          // halve step by step: a cheap, clean blur
+      pw = Math.max(1, Math.round(pw / 2)); ph = Math.max(1, Math.round(ph / 2));
+      var c = document.createElement('canvas'); c.width = pw; c.height = ph;
+      pyr.push({ c: c, x: c.getContext('2d') });
+    }
+    return true;
+  }
+
+  function centerMean() {
+    if (!setupCanvases()) return null;
+    actx.drawImage(video, 0, 0, AW, AH);
+    var x0 = Math.round(AW * 0.3), y0 = Math.round(AH * 0.3), w = Math.round(AW * 0.4), h = Math.round(AH * 0.4);
+    var d = actx.getImageData(x0, y0, w, h).data, r = 0, g = 0, b = 0, n = d.length / 4;
+    for (var i = 0; i < d.length; i += 4) { r += d[i]; g += d[i + 1]; b += d[i + 2]; }
+    return [Math.round(r / n), Math.round(g / n), Math.round(b / n)];
+  }
+
+  function rgb2lab(r, g, b) {
+    var f = function (u) { u /= 255; return u <= 0.04045 ? u / 12.92 : Math.pow((u + 0.055) / 1.055, 2.4); };
+    var R = f(r), G = f(g), B = f(b);
+    var X = (0.4124 * R + 0.3576 * G + 0.1805 * B) / 0.95047, Y = 0.2126 * R + 0.7152 * G + 0.0722 * B, Z = (0.0193 * R + 0.1192 * G + 0.9505 * B) / 1.08883;
+    var h = function (t) { return t > 0.008856 ? Math.cbrt(t) : 7.787 * t + 16 / 116; };
+    var fx = h(X), fy = h(Y), fz = h(Z);
+    return [116 * fy - 16, 500 * (fx - fy), 200 * (fy - fz)];
+  }
+  function rgb2hue(r, g, b) {
+    var mx = Math.max(r, g, b), mn = Math.min(r, g, b), d = mx - mn, h;
+    if (d < 1e-6) return 0;
+    if (mx === r) h = ((g - b) / d) % 6; else if (mx === g) h = (b - r) / d + 2; else h = (r - g) / d + 4;
+    h *= 60; if (h < 0) h += 360;
+    return h;
+  }
+
+  // One frame -> numbers. "Field" is the lit circle seen through the eyepiece.
+  function analyze() {
+    if (!setupCanvases()) return null;
+    actx.drawImage(video, 0, 0, AW, AH);
+    var src = A;
+    for (var p = 0; p < pyr.length; p++) { pyr[p].x.drawImage(src, 0, 0, pyr[p].c.width, pyr[p].c.height); src = pyr[p].c; }
+    bctx.imageSmoothingEnabled = true;
+    bctx.drawImage(src, 0, 0, AW, AH);
+    var a = actx.getImageData(0, 0, AW, AH).data, b = bctx.getImageData(0, 0, AW, AH).data;
+    var n = AW * AH, N4 = n * 4, i, bv, v;
+    var hist = new Uint32Array(256);
+    for (i = 0; i < N4; i += 4) { bv = b[i] > b[i + 1] ? b[i] : b[i + 1]; if (b[i + 2] > bv) bv = b[i + 2]; hist[bv]++; }
+    var acc = 0, p95 = 255, need = n * 0.05;
+    for (i = 255; i >= 0; i--) { acc += hist[i]; if (acc >= need) { p95 = i; break; } }
+    var thr = Math.max(12, 0.5 * p95);
+    var field = 0, dark = 0, yel = 0, sr = 0, sg = 0, sb = 0, clip = 0;
+    for (i = 0; i < N4; i += 4) {
+      bv = b[i] > b[i + 1] ? b[i] : b[i + 1]; if (b[i + 2] > bv) bv = b[i + 2];
+      if (bv <= thr) continue;
+      field++;
+      var r = a[i], g = a[i + 1], bl = a[i + 2];
+      sr += r; sg += g; sb += bl;
+      v = r > g ? r : g; if (bl > v) v = bl;
+      if (v >= 250) clip++;
+      if (v < 0.80 * bv) dark++;
+      else if (v > 1.10 * bv) yel++;   // a fine point at least 10% brighter than its surroundings
+    }
+    if (field < n * 0.02) return { ok: false, field: field / n };
+    var R = sr / field, G = sg / field, B = sb / field, lab = rgb2lab(R, G, B);
+    return { ok: true, field: field / n, R: R, G: G, B: B, hue: rgb2hue(R, G, B), L: lab[0], a: lab[1], b: lab[2],
+             yellow: 100 * yel / field, dark: 100 * dark / field, clip: 100 * clip / field };
+  }
+
+  // ---------- sampling loop ----------
+  function sample() {
+    if (!track || video.readyState < 2 || state === 'done') return;
+    tick++;
+    if (state === 'ready' && tick % 2) return;          // 2 per second while just looking
+    var m; try { m = analyze(); } catch (e) { return; }
+    if (!m) return;
+    var t = (state === 'rec') ? (performance.now() - tRec0) / 1000 : null;
+    if (m.ok) {
+      $('nHue').textContent = r1(m.hue); $('nL').textContent = Math.round(m.L);
+      $('nY').textContent = r1(m.yellow); $('nD').textContent = r1(m.dark);
+      $('fieldNote').textContent = '光っている視野は画面の ' + Math.round(m.field * 100) + '% 。' + (m.clip > 2 ? '明るすぎて色が飛んでいる所が ' + Math.round(m.clip) + '% あります。' : '');
+    } else {
+      $('nHue').textContent = $('nL').textContent = $('nY').textContent = $('nD').textContent = '–';
+      $('fieldNote').textContent = '光っている視野が見つかりません。';
+    }
+    if (state === 'rec') {
+      rows.push({ t: t, m: m });
+      renderClock(t);
+      drawCharts(t);
+      if (tick % 8 === 0) checkLock(t);
+    }
+  }
+
+  function checkLock(t) {
+    if (!wbLocked || lockLost) return;
+    var wb = getSettings().whiteBalanceMode;
+    if (wb && wb !== 'manual') {
+      lockLost = true;
+      marks.push({ t: t, label: '色の固定が外れた' });
+      show($('runMsg'), '色の固定が外れました。この回の色の数字は、ここから先は当てになりません。');
+    }
+  }
+
+  function renderClock(t) {
+    var c = $('clock');
+    if (tDrop === null) c.innerHTML = '録画 ' + t.toFixed(1) + ' 秒<small>酸を落としたら「滴下した」を押してください</small>';
+    else c.innerHTML = '滴下から ' + (t - tDrop).toFixed(1) + ' 秒' + (tOut !== null ? '<small>アウト：滴下から ' + (tOut - tDrop).toFixed(1) + ' 秒</small>' : '');
+  }
+
+  // ---------- charts ----------
+  function sizeCharts() {
+    ['chHue', 'chY', 'chL'].forEach(function (id) {
+      var c = $(id), dpr = window.devicePixelRatio || 1, w = c.clientWidth, h = c.clientHeight;
+      if (!w) return;
+      c.width = Math.round(w * dpr); c.height = Math.round(h * dpr);
+      c.getContext('2d').setTransform(dpr, 0, 0, dpr, 0, 0);
+    });
+    if (rows.length) drawCharts(rows[rows.length - 1].t);
+  }
+  function drawOne(id, key, lo, hi, tMax) {
+    var c = $(id), w = c.clientWidth, h = c.clientHeight; if (!w) return;
+    var x = c.getContext('2d');
+    x.clearRect(0, 0, w, h);
+    var vals = rows.filter(function (r) { return r.m.ok; }).map(function (r) { return r.m[key]; });
+    if (vals.length) { hi = Math.max(hi, Math.max.apply(null, vals) * 1.1); lo = Math.min(lo, Math.min.apply(null, vals)); }
+    var X = function (t) { return 34 + t / tMax * (w - 40); };
+    var Y = function (v) { return h - 14 - (v - lo) / (hi - lo) * (h - 22); };
+    x.font = '10px sans-serif'; x.fillStyle = '#9ba6b3'; x.strokeStyle = '#2d353f'; x.lineWidth = 1;
+    [lo, (lo + hi) / 2, hi].forEach(function (v) {
+      x.beginPath(); x.moveTo(34, Y(v)); x.lineTo(w - 6, Y(v)); x.stroke();
+      x.fillText(String(Math.round(v * 10) / 10), 2, Y(v) + 3);
+    });
+    x.fillText('0', 34, h - 2); x.fillText(Math.round(tMax) + '秒', w - 34, h - 2);
+    x.setLineDash([4, 3]); x.strokeStyle = '#f0c04c'; x.fillStyle = '#f0c04c';
     marks.forEach(function (m) {
-      if (m.t < tStart) return;
-      cctx.beginPath(); cctx.moveTo(x(m.t), 0); cctx.lineTo(x(m.t), h); cctx.stroke();
-      cctx.fillText(m.label.slice(0, 8), Math.min(x(m.t) + 3, w - 60), 12);
+      x.beginPath(); x.moveTo(X(m.t), 4); x.lineTo(X(m.t), h - 14); x.stroke();
+      x.fillText(m.label.slice(0, 4), Math.min(X(m.t) + 3, w - 30), 12);
     });
-    cctx.setLineDash([]);
-    cctx.strokeStyle = '#0b6bcb'; cctx.lineWidth = 2; cctx.beginPath();
-    var started = false;
-    hist.forEach(function (p) {
-      if (p.t < tStart) return;
-      if (!started) { cctx.moveTo(x(p.t), y(p.L)); started = true; } else cctx.lineTo(x(p.t), y(p.L));
+    x.setLineDash([]); x.strokeStyle = '#4c9cf0'; x.lineWidth = 2; x.beginPath();
+    var on = false;
+    rows.forEach(function (r) {
+      if (!r.m.ok) { on = false; return; }
+      if (!on) { x.moveTo(X(r.t), Y(r.m[key])); on = true; } else x.lineTo(X(r.t), Y(r.m[key]));
     });
-    cctx.stroke();
+    x.stroke();
+  }
+  function drawCharts(t) {
+    var tMax = Math.max(30, t * 1.05);
+    drawOne('chHue', 'hue', 10, 40, tMax);
+    drawOne('chY', 'yellow', 0, 5, tMax);
+    drawOne('chL', 'L', 0, 50, tMax);
   }
 
-  // ---- report ----
-  function updateReport() {
-    var sup = getSupported(), supKeys = KEYS.map(function (k) { return k[0]; }).filter(function (k) { return sup[k]; });
-    var cams = Array.prototype.map.call($('cam').options, function (o) { return (o.selected ? '* ' : '  ') + o.textContent; });
-    var series = hist.filter(function (p, i) { return i % 4 === 0; })   // one per second
-      .map(function (p) { return Math.round(p.t) + ':' + Math.round(p.L) + '/' + Math.round(p.R) + '/' + Math.round(p.G) + '/' + Math.round(p.B); });
-    var lines = [
-      '=== カメラ固定テスト結果 ===',
-      'ブラウザ: ' + navigator.userAgent,
-      '安全な接続: ' + window.isSecureContext,
-      '名前だけ対応している項目: ' + (supKeys.join(', ') || 'なし'),
-      'カメラ一覧:', cams.join('\n') || '  （取得できず）',
-      '選べる値: ' + JSON.stringify(getCaps()),
-      '今の値: ' + JSON.stringify(getSettings()),
-      '操作の記録:'
-    ].concat(applyLog.map(function (a) { return '  ' + a.t + '秒 ' + a.label + ' → ' + a.result; }))
-     .concat(['印: ' + marks.map(function (m) { return m.t + '秒=' + m.label; }).join(', '),
-              '毎秒の値（秒:明るさ/赤/緑/青）:', series.join(' ')]);
-    $('report').value = lines.join('\n');
+  // ---------- recording ----------
+  function pickMime() {
+    if (!window.MediaRecorder) return null;
+    var c = ['video/mp4;codecs=avc1', 'video/mp4', 'video/webm;codecs=vp9', 'video/webm'];
+    for (var i = 0; i < c.length; i++) { try { if (MediaRecorder.isTypeSupported(c[i])) return c[i]; } catch (e) {} }
+    return '';
   }
 
+  async function startRec() {
+    hide($('recMsg'));
+    if (!track) return;
+    if (!wbLocked && !recArmed) {
+      recArmed = true;
+      show($('recMsg'), '色がまだ固定されていません。固定せずに始めるなら、もう一度押してください。');
+      return;
+    }
+    recArmed = false;
+    rows = []; marks = []; chunks = []; recBlob = null; tDrop = null; tOut = null; lockLost = false;
+    hide($('runMsg'));
+    $('drop').textContent = '滴下した'; $('drop').className = 'mark';
+    $('out').textContent = '目で見て「アウト」'; $('out').className = 'mark';
+    recMime = pickMime(); rec = null;
+    if (recMime !== null) {
+      try {
+        rec = new MediaRecorder(stream, recMime ? { mimeType: recMime, videoBitsPerSecond: 3000000 } : { videoBitsPerSecond: 3000000 });
+        rec.ondataavailable = function (e) { if (e.data && e.data.size) chunks.push(e.data); };
+        rec.onstop = function () { recBlob = new Blob(chunks, { type: (rec && rec.mimeType) || recMime || 'video/mp4' }); finish(); };
+        rec.start(1000);
+      } catch (e) { rec = null; }
+    }
+    startedAt = new Date(); tRec0 = performance.now();
+    setState('rec');
+    if (!rec) show($('runMsg'), 'このブラウザでは動画を残せません。数字だけ記録します。');
+    try { if (navigator.wakeLock) wake = await navigator.wakeLock.request('screen'); } catch (e) {}
+  }
+
+  function nowT() { return (performance.now() - tRec0) / 1000; }
+  function setMark(label, t) {
+    marks = marks.filter(function (m) { return m.label !== label; });
+    marks.push({ t: t, label: label });
+  }
+
+  function stopRec() {
+    if (state !== 'rec') return;
+    marks.push({ t: nowT(), label: '終了' });
+    try { if (wake) { wake.release(); wake = null; } } catch (e) {}
+    if (rec && rec.state !== 'inactive') { try { rec.stop(); return; } catch (e) {} }
+    finish();
+  }
+
+  // ---------- results ----------
+  function nearest(t) {
+    var best = null, bd = 1e9;
+    rows.forEach(function (r) { if (!r.m.ok) return; var d = Math.abs(r.t - t); if (d < bd) { bd = d; best = r; } });
+    return best;
+  }
+  function baseName() {
+    var d = startedAt || new Date(), p = function (n) { return (n < 10 ? '0' : '') + n; };
+    var memo = $('memo').value.trim().replace(/[\\\/:*?"<>|\s]+/g, '_').slice(0, 40);
+    return 'nori_' + d.getFullYear() + p(d.getMonth() + 1) + p(d.getDate()) + '_' + p(d.getHours()) + p(d.getMinutes()) + p(d.getSeconds()) + (memo ? '_' + memo : '');
+  }
+  function metaLines() {
+    var st = getSettings();
+    return [
+      'メモ: ' + $('memo').value.trim(),
+      '日時: ' + (startedAt ? startedAt.toLocaleString('ja-JP') : ''),
+      'カメラ: ' + camLabel() + ' / ' + (st.width || '?') + 'x' + (st.height || '?') + ' / ' + (st.frameRate || '?') + 'fps',
+      '色の調整: ' + (wbLocked ? (lockLost ? '固定（途中で外れた）' : '固定') : '自動（固定なし）') + ' / 終了時の値=' + (st.whiteBalanceMode || '不明'),
+      '白い紙の色(赤/緑/青): ' + (whiteRef ? whiteRef.join('/') : 'なし'),
+      '印: ' + marks.map(function (m) { return m.label + '=' + r1(m.t) + '秒'; }).join(', '),
+      'ブラウザ: ' + navigator.userAgent
+    ];
+  }
+  function buildCsv() {
+    var out = metaLines().map(function (l) { return '# ' + l; });
+    out.push('t_sec,t_from_drop_sec,field_pct,R,G,B,hue,L,a,b,speck_pct,dark_pct,clip_pct,mark');
+    rows.forEach(function (r, i) {
+      var next = rows[i + 1] ? rows[i + 1].t : r.t + 0.25;
+      var mk = marks.filter(function (m) { return m.t >= r.t && m.t < next; }).map(function (m) { return m.label; }).join('/');
+      var m = r.m, td = (tDrop === null) ? '' : r2(r.t - tDrop);
+      out.push(m.ok
+        ? [r2(r.t), td, r1(m.field * 100), r1(m.R), r1(m.G), r1(m.B), r2(m.hue), r1(m.L), r1(m.a), r1(m.b), r2(m.yellow), r2(m.dark), r1(m.clip), mk].join(',')
+        : [r2(r.t), td, r1(m.field * 100), '', '', '', '', '', '', '', '', '', '', mk].join(','));
+    });
+    return '﻿' + out.join('\r\n');
+  }
+  function buildReport() {
+    var per = rows.filter(function (r, i) { return i % 4 === 0 && r.m.ok; }).map(function (r) {
+      var m = r.m; return Math.round(r.t) + ':' + r1(m.hue) + '/' + Math.round(m.L) + '/' + r1(m.yellow) + '/' + r1(m.dark) + '/' + Math.round(m.R) + '/' + Math.round(m.G) + '/' + Math.round(m.B);
+    });
+    return ['=== 海苔 蛍光チェッカー 結果 ==='].concat(metaLines())
+      .concat(['動画: ' + (recBlob ? (recBlob.size / 1048576).toFixed(1) + 'MB ' + recBlob.type : 'なし'),
+               '毎秒の値（秒:色あい/明るさ/明るい粒%/黒い点%/赤/緑/青）:', per.join(' ')]).join('\n');
+  }
+
+  function finish() {
+    setState('done');
+    var tEnd = rows.length ? rows[rows.length - 1].t : 0;
+    drawCharts(tEnd);
+    var li = [];
+    li.push('記録した時間： ' + r1(tEnd) + ' 秒');
+    if (tDrop !== null && tOut !== null) li.push('滴下から目で見た「アウト」まで： ' + r1(tOut - tDrop) + ' 秒');
+    else if (tDrop === null) li.push('「滴下した」が押されていません（時間は録画の頭から数えています）');
+    var pts = [['始め', rows.length ? rows[0].t : 0]];
+    if (tDrop !== null) pts.push(['滴下', tDrop]);
+    if (tOut !== null) pts.push(['アウト', tOut]);
+    pts.push(['終わり', tEnd]);
+    var hues = pts.map(function (p) { var r = nearest(p[1]); return r ? p[0] + ' ' + r1(r.m.hue) : null; }).filter(Boolean);
+    if (hues.length) li.push('色あい： ' + hues.join(' → '));
+    var ok = rows.filter(function (r) { return r.m.ok; });
+    if (ok.length) li.push('明るい粒： 最大 ' + r1(Math.max.apply(null, ok.map(function (r) { return r.m.yellow; }))) + ' %　／　黒い点： 最大 ' + r1(Math.max.apply(null, ok.map(function (r) { return r.m.dark; }))) + ' %');
+    if (!wbLocked) li.push('色を固定せずに撮った記録です');
+    if (lockLost) li.push('途中で色の固定が外れました');
+    li.push(recBlob ? '動画： ' + (recBlob.size / 1048576).toFixed(1) + ' MB' : '動画： なし');
+    var ul = $('summary'); ul.innerHTML = '';
+    li.forEach(function (t) { var e = document.createElement('li'); e.textContent = t; ul.appendChild(e); });
+    $('saveVideo').hidden = !recBlob;
+    $('report').value = buildReport();
+    hide($('copyMsg'));
+    renderClock(tEnd);
+  }
+
+  function saveBlob(blob, name) {
+    var fallback = function () {
+      var u = URL.createObjectURL(blob), a = document.createElement('a');
+      a.href = u; a.download = name; document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(function () { URL.revokeObjectURL(u); }, 60000);
+    };
+    var file = null;
+    try { file = new File([blob], name, { type: blob.type }); } catch (e) {}
+    if (file && navigator.canShare && navigator.canShare({ files: [file] })) {
+      navigator.share({ files: [file] }).catch(function (e) { if (!e || e.name !== 'AbortError') fallback(); });
+    } else fallback();
+  }
+
+  // ---------- wiring ----------
   $('start').addEventListener('click', function () { start($('cam').value || null); });
   $('cam').addEventListener('change', function () { start($('cam').value); });
-  $('lockWB').addEventListener('click', lockButton('whiteBalanceMode', '色を固定'));
-  $('lockEX').addEventListener('click', lockButton('exposureMode', '明るさを固定'));
-  $('lockFO').addEventListener('click', lockButton('focusMode', 'ピントを固定'));
-  $('unlock').addEventListener('click', unlockAll);
-  $('copy').addEventListener('click', function () {
-    updateReport();
-    var ta = $('report');
-    var done = function () { show($('copyMsg'), 'コピーしました。チャットに貼り付けてください。'); };
-    var manual = function () { ta.focus(); ta.select(); show($('copyMsg'), '自動でコピーできませんでした。下の文字を全部選んでコピーしてください。'); };
-    if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(ta.value).then(done, manual);
-    else manual();
+  $('lock').addEventListener('click', lockWB);
+  $('unlock').addEventListener('click', unlockWB);
+  $('rec').addEventListener('click', startRec);
+  $('drop').addEventListener('click', function () {
+    var t = nowT(); tDrop = t; setMark('滴下', t);
+    $('drop').textContent = '滴下した ✓（押し直すと時刻を取り直します）'; $('drop').className = 'mark done';
   });
-  window.addEventListener('resize', sizeChart);
+  $('out').addEventListener('click', function () {
+    var t = nowT(); tOut = t; setMark('アウト', t);
+    $('out').textContent = '「アウト」 ✓（押し直すと時刻を取り直します）'; $('out').className = 'mark done';
+  });
+  $('stop').addEventListener('click', stopRec);
+  $('saveVideo').addEventListener('click', function () {
+    if (recBlob) saveBlob(recBlob, baseName() + (recBlob.type.indexOf('webm') >= 0 ? '.webm' : '.mp4'));
+  });
+  $('saveCsv').addEventListener('click', function () { saveBlob(new Blob([buildCsv()], { type: 'text/csv' }), baseName() + '.csv'); });
+  $('copy').addEventListener('click', function () {
+    var ta = $('report');
+    var done = function () { show($('copyMsg'), 'コピーしました。'); };
+    var manual = function () { ta.focus(); ta.select(); show($('copyMsg'), '自動でコピーできませんでした。下の文字を全部選んでコピーしてください。'); };
+    if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(ta.value).then(done, manual); else manual();
+  });
+  $('next').addEventListener('click', function () {
+    rows = []; marks = []; chunks = []; recBlob = null; tDrop = null; tOut = null; $('memo').value = '';
+    setState('ready'); renderLock(); window.scrollTo(0, 0);
+  });
+  window.addEventListener('resize', sizeCharts);
+  window.addEventListener('beforeunload', function (e) { if (state === 'rec' || (state === 'done' && recBlob)) { e.preventDefault(); e.returnValue = ''; } });
 })();
 </script>
 </body>

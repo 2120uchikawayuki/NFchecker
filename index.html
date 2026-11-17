@@ -53,7 +53,7 @@
 </head>
 <body>
 <main>
-  <h1>海苔 蛍光チェッカー <span class="small">試作 0.3</span></h1>
+  <h1>海苔 蛍光チェッカー <span class="small">試作 0.4</span></h1>
   <p class="small">色の自動調整を止めて録画し、色の変化を数字にします。映像と数字はこのスマホの中だけにあり、保存するまでどこにも送られません。</p>
 
   <div id="stage" hidden>
@@ -66,30 +66,10 @@
     <div id="clock" hidden></div>
   </div>
 
-  <section id="cStart">
-    <h2>1. カメラを起動する</h2>
-    <button id="start">カメラを起動する</button>
-    <div id="camWrap" hidden>
-      <p class="small" style="margin-top:8px">使うカメラ（レンズが勝手に替わらないよう「背面カメラ」だけを使います）</p>
-      <select id="cam"></select>
-    </div>
-    <div id="startMsg" class="msg" hidden></div>
-  </section>
-
-  <section id="cLock" hidden>
-    <h2>2. 白い紙で色を固定する</h2>
-    <p class="small">白い紙にカメラを向けて、画面いっぱいに映してから押してください。毎回、同じ紙と同じ明かりで行うと、日をまたいでも比べやすくなります。</p>
-    <button id="lock">色を固定する</button>
-    <button id="unlock" class="sub" hidden>固定をやめる（自動に戻す）</button>
-    <div id="lockState" class="state"></div>
-    <div id="lockMsg" class="msg" hidden></div>
-  </section>
-
   <section id="cRec" hidden>
-    <h2>3. 顕微鏡に合わせて、録画を始める</h2>
-    <p class="small">酸をかける前の海苔にピントを合わせてから始めます。映像は勝手には動きません。大きく見たいときだけ、映像の下の「視野を拡大する」を押してください。滴下の時刻は、撮り終えたあとに映像を見ながら決めます。</p>
-    <input id="memo" type="text" placeholder="メモ（海苔や液の名前など。あとでファイル名になります）" autocomplete="off">
-    <button id="rec" class="go" style="margin-top:8px">録画と計測を始める</button>
+    <h2>顕微鏡に合わせて、録画を始める</h2>
+    <p class="small">スマホを顕微鏡に固定し、酸をかける前の海苔にピントを合わせてから押してください。押した瞬間に、色の自動調整を止めます。滴下の時刻は、撮り終えたあとに映像を見ながら決めます。</p>
+    <button id="rec" class="go">録画と計測を始める</button>
     <div id="recMsg" class="msg" hidden></div>
   </section>
 
@@ -99,7 +79,7 @@
   </section>
 
   <section id="cReview" hidden>
-    <h2>4. 映像を見て、滴下とアウトを決める</h2>
+    <h2>映像を見て、滴下とアウトを決める</h2>
     <p class="small">つまみを動かすと、上の映像がその時刻のものに替わります（1秒に4コマ）。</p>
     <input id="seek" type="range" min="0" max="0" step="1" value="0">
     <div id="pos"></div>
@@ -136,15 +116,26 @@
     </div>
   </section>
 
+  <section id="cStart">
+    <h2>カメラ</h2>
+    <button id="start">カメラを起動する</button>
+    <div id="camWrap" hidden>
+      <p class="small" style="margin-top:8px">使うカメラ（レンズが勝手に替わらないよう「背面カメラ」だけを使います）</p>
+      <select id="cam"></select>
+    </div>
+    <div id="startMsg" class="msg" hidden></div>
+  </section>
+
   <section id="cDone" hidden>
-    <h2>5. 保存する</h2>
+    <h2>保存する</h2>
     <ul class="sum" id="summary"></ul>
+    <input id="memo" type="text" placeholder="名前（海苔や液の名前。入れなくても保存できます）" autocomplete="off" style="margin-bottom:6px">
     <button id="saveVideo">動画を保存する</button>
     <button id="saveCsv">数字の表（CSV）を保存する</button>
     <button id="copy" class="sub">結果を文字でコピーする</button>
     <div id="copyMsg" class="msg" hidden></div>
     <textarea id="report" readonly></textarea>
-    <button id="next" class="go" style="margin-top:10px">次の試料へ（色の固定はそのまま）</button>
+    <button id="next" class="go" style="margin-top:10px">次の試料へ</button>
   </section>
 
   <p class="small" style="margin-top:18px">カメラの固定を調べるページは <a href="test.html">こちら</a>。</p>
@@ -157,9 +148,9 @@
   var video = $('video');
   var stream = null, track = null;
   var state = 'idle';                 // idle / ready / rec / done
-  var wbLocked = false, whiteRef = null, lockLost = false;
+  var wbLocked = false, lockLost = false, wbAtEnd = '', starting = false;   // wbLocked: colour was held during this run
   var rec = null, chunks = [], recBlob = null, recMime = '';
-  var rows = [], tRec0 = 0, tDrop = null, tOut = null, tCand = null, startedAt = null, recArmed = false;
+  var rows = [], tRec0 = 0, tDrop = null, tOut = null, tCand = null, startedAt = null;
   var sampler = null, wake = null, tick = 0, cur = 0;
   var box = null, zoomed = false;     // the enlarged view: fixed when the button is pressed, never moves by itself
   var snapBox = null, lastOk = null;  // area kept in the review pictures; last good measurement
@@ -184,7 +175,6 @@
     state = s;
     $('stage').hidden = (s === 'idle');
     $('cStart').hidden = (s === 'rec' || s === 'done');
-    $('cLock').hidden = (s !== 'ready');
     $('cRec').hidden = (s !== 'ready');
     $('cRun').hidden = (s !== 'rec');
     $('cReview').hidden = (s !== 'done');
@@ -242,10 +232,10 @@
     }
     if (deviceId) { try { localStorage.setItem('camId', deviceId); } catch (e) {} }
     // a new camera starts in automatic colour: any earlier lock no longer holds
-    wbLocked = false; whiteRef = null; lockLost = false; box = null; zoomed = false; lastOk = null;
+    wbLocked = false; lockLost = false; box = null; zoomed = false; lastOk = null;
     $('start').textContent = 'カメラを起動し直す'; $('start').className = 'sub';
     setState('ready');
-    renderLock(); applyView();
+    applyView();
     if (!sampler) sampler = setInterval(sample, 250);
   }
 
@@ -269,43 +259,12 @@
     return null;
   }
 
-  // ---------- colour lock ----------
-  function renderLock() {
-    var el = $('lockState');
-    if (wbLocked) {
-      el.className = 'state ok';
-      el.textContent = '色の調整： 固定中' + (whiteRef ? '（白い紙の色　赤' + whiteRef[0] + '・緑' + whiteRef[1] + '・青' + whiteRef[2] + '）' : '');
-    } else {
-      el.className = 'state';
-      el.textContent = '色の調整： 自動（まだ固定していません）';
-    }
-    $('lock').textContent = wbLocked ? '白い紙で固定し直す' : '色を固定する';
-    $('lock').className = wbLocked ? 'sub' : '';
-    $('unlock').hidden = !wbLocked;
-  }
+  // ---------- colour: stop the automatic adjustment while recording ----------
   async function setWB(mode) { await track.applyConstraints({ advanced: [{ whiteBalanceMode: mode }] }); }
-
-  async function lockWB() {
-    hide($('lockMsg'));
-    if (!track) return;
+  async function lockForRun() {
     var list = getCaps().whiteBalanceMode;
-    if (!Array.isArray(list) || list.indexOf('manual') < 0) {
-      show($('lockMsg'), 'このブラウザでは色を固定できません。iPhoneのSafariで開いてください。固定なしでも録画はできますが、色の数字は当てになりません。');
-      return;
-    }
-    try {
-      if (wbLocked) { await setWB('continuous'); await new Promise(function (r) { setTimeout(r, 1500); }); }
-      await setWB('manual');
-    } catch (e) {
-      show($('lockMsg'), '色を固定できませんでした（' + e.name + '）。');
-      return;
-    }
-    wbLocked = true; lockLost = false; whiteRef = null; renderLock();
-    setTimeout(function () { whiteRef = centerMean(); renderLock(); }, 700);
-  }
-  async function unlockWB() {
-    try { await setWB('continuous'); } catch (e) {}
-    wbLocked = false; whiteRef = null; renderLock();
+    if (!Array.isArray(list) || list.indexOf('manual') < 0) return false;
+    try { await setWB('manual'); return true; } catch (e) { return false; }
   }
 
   // ---------- image analysis ----------
@@ -332,15 +291,6 @@
       pyr.push({ c: c, x: c.getContext('2d') });
     }
     return true;
-  }
-
-  function centerMean() {
-    if (!setupCanvases()) return null;
-    actx.drawImage(video, 0, 0, AW, AH);
-    var x0 = Math.round(AW * 0.3), y0 = Math.round(AH * 0.3), w = Math.round(AW * 0.4), h = Math.round(AH * 0.4);
-    var d = actx.getImageData(x0, y0, w, h).data, r = 0, g = 0, b = 0, n = d.length / 4;
-    for (var i = 0; i < d.length; i += 4) { r += d[i]; g += d[i + 1]; b += d[i + 2]; }
-    return [Math.round(r / n), Math.round(g / n), Math.round(b / n)];
   }
 
   function rgb2lab(r, g, b) {
@@ -533,15 +483,10 @@
 
   async function startRec() {
     hide($('recMsg'));
-    if (!track) return;
-    if (!wbLocked && !recArmed) {
-      recArmed = true;
-      show($('recMsg'), '色がまだ固定されていません。固定せずに始めるなら、もう一度押してください。');
-      return;
-    }
-    recArmed = false;
-    clearRun(); lockLost = false;
-    hide($('runMsg'));
+    if (!track || state !== 'ready' || starting) return;
+    starting = true;
+    clearRun(); lockLost = false; hide($('runMsg'));
+    wbLocked = await lockForRun();                      // from here the camera stops re-tuning colour
     recMime = pickMime(); rec = null;
     if (recMime !== null) {
       try {
@@ -553,8 +498,11 @@
     }
     snapBox = (zoomed && box) ? clampBox(box) : clampBox(lastOk ? fieldBox(lastOk) : null);   // fixed for the whole run
     startedAt = new Date(); tRec0 = performance.now();
-    setState('rec');
-    if (!rec) show($('runMsg'), 'このブラウザでは動画を残せません。数字だけ記録します。');
+    setState('rec'); starting = false;
+    var warn = [];
+    if (!wbLocked) warn.push('このブラウザでは色の自動調整を止められませんでした。色の数字は当てになりません。');
+    if (!rec) warn.push('このブラウザでは動画を残せません。数字だけ記録します。');
+    if (warn.length) show($('runMsg'), warn.join(' '));
     try { if (navigator.wakeLock) wake = await navigator.wakeLock.request('screen'); } catch (e) {}
   }
 
@@ -626,8 +574,7 @@
       'メモ: ' + $('memo').value.trim(),
       '日時: ' + (startedAt ? startedAt.toLocaleString('ja-JP') : ''),
       'カメラ: ' + camLabel() + ' / ' + (st.width || '?') + 'x' + (st.height || '?') + ' / ' + (st.frameRate || '?') + 'fps',
-      '色の調整: ' + (wbLocked ? (lockLost ? '固定（途中で外れた）' : '固定') : '自動（固定なし）') + ' / 終了時の値=' + (st.whiteBalanceMode || '不明'),
-      '白い紙の色(赤/緑/青): ' + (whiteRef ? whiteRef.join('/') : 'なし'),
+      '色の調整: ' + (wbLocked ? (lockLost ? '録画中は固定（途中で外れた）' : '録画中は固定') : '自動のまま（止められなかった）') + ' / 終了時の値=' + (wbAtEnd || '不明'),
       '滴下（映像で決めた時刻）: ' + (tDrop !== null ? r2(tDrop) + '秒' : '未設定'),
       'アウト（映像で決めた時刻）: ' + (tOut !== null ? r2(tOut) + '秒' + (tDrop !== null ? '（滴下から' + r2(tOut - tDrop) + '秒）' : '') : '未設定'),
       '揺れから見た滴下の候補: ' + (tCand !== null ? r2(tCand) + '秒' : 'なし'),
@@ -667,7 +614,7 @@
     if (hues.length) li.push('色あい： ' + hues.join(' → '));
     var ok = rows.filter(function (r) { return r.m.ok; });
     if (ok.length) li.push('明るい粒： 最大 ' + r1(Math.max.apply(null, ok.map(function (r) { return r.m.yellow; }))) + ' %　／　黒い点： 最大 ' + r1(Math.max.apply(null, ok.map(function (r) { return r.m.dark; }))) + ' %');
-    if (!wbLocked) li.push('色を固定せずに撮った記録です');
+    if (!wbLocked) li.push('色の自動調整を止められなかった記録です');
     if (lockLost) li.push('途中で色の固定が外れました');
     li.push(recBlob ? '動画： ' + (recBlob.size / 1048576).toFixed(1) + ' MB' : '動画： なし');
     var ul = $('summary'); ul.innerHTML = '';
@@ -676,6 +623,8 @@
   }
 
   function finish() {
+    wbAtEnd = getSettings().whiteBalanceMode || '';
+    if (wbLocked) { setWB('continuous').catch(function () {}); }   // back to normal until the next run
     setState('done');
     tCand = findDropCandidate();
     $('seek').max = String(Math.max(0, rows.length - 1));
@@ -704,8 +653,6 @@
   // ---------- wiring ----------
   $('start').addEventListener('click', function () { start($('cam').value || null); });
   $('cam').addEventListener('change', function () { start($('cam').value); });
-  $('lock').addEventListener('click', lockWB);
-  $('unlock').addEventListener('click', unlockWB);
   $('rec').addEventListener('click', startRec);
   $('stop').addEventListener('click', stopRec);
   $('zoomBtn').addEventListener('click', toggleZoom);
@@ -726,10 +673,12 @@
   });
   $('next').addEventListener('click', function () {
     clearRun(); $('memo').value = ''; $('still').removeAttribute('src');
-    setState('ready'); renderLock(); applyView(); window.scrollTo(0, 0);
+    setState('ready'); applyView(); window.scrollTo(0, 0);
   });
+  $('memo').addEventListener('input', function () { $('report').value = buildReport(); });
   video.addEventListener('loadedmetadata', applyView);
   window.addEventListener('resize', sizeCharts);
+  if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) start(null);   // open straight into the camera
   window.addEventListener('beforeunload', function (e) { if (state === 'rec' || (state === 'done' && recBlob)) { e.preventDefault(); e.returnValue = ''; } });
 })();
 </script>

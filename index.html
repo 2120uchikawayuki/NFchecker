@@ -6,7 +6,7 @@
 <title>海苔 蛍光チェッカー（試作）</title>
 <style>
   :root { --bg:#101317; --card:#1a1f25; --line:#2d353f; --ink:#e9ecf0; --sub:#9ba6b3;
-          --accent:#4c9cf0; --go:#2e9e68; --stop:#d5534e; --mark:#f0c04c; }
+          --accent:#4c9cf0; --go:#2e9e68; --stop:#d5534e; --mark:#f0c04c; --s2:#f08a4c; }
   * { box-sizing:border-box; }
   body { margin:0; padding:0 12px 56px; background:var(--bg); color:var(--ink);
          font-family:"Hiragino Sans","Hiragino Kaku Gothic ProN","Noto Sans JP","Yu Gothic",sans-serif;
@@ -28,23 +28,28 @@
   #stage { position:sticky; top:0; z-index:5; background:var(--bg); padding-top:8px; }
   #view { position:relative; width:min(100%, 44vh); aspect-ratio:1 / 1; margin:0 auto; overflow:hidden; border-radius:10px; background:#000; }
   #view video { position:absolute; left:0; top:0; width:100%; height:auto; max-width:none; }
+  #cmp { display:grid; grid-template-columns:1fr 1fr; gap:6px; }
+  #cmp figure { margin:0; }
+  #cmp canvas { width:100%; aspect-ratio:1 / 1; display:block; border-radius:8px; background:#000; }
+  #cmp figcaption { font-size:12px; text-align:center; color:var(--sub); padding:2px 0 4px; font-variant-numeric:tabular-nums; }
   #zoomBtn { padding:8px 12px; font-size:14px; margin:6px 0 0; }
-  #view img { position:absolute; left:0; top:0; width:100%; height:100%; object-fit:cover; }
   #clock { font-size:20px; font-weight:700; text-align:center; padding:6px 0 4px; font-variant-numeric:tabular-nums; }
   .msg { font-size:14px; padding:8px 10px; border-radius:8px; background:#3a2c0d; color:#f3d48a; margin:8px 0 0; }
   .state { font-size:14px; padding:8px 10px; border-radius:8px; background:#0f2337; color:#a9d0f7; margin:8px 0 0; }
   .state.ok { background:#0f2b1e; color:#9fe0bd; }
-  .nums { display:grid; grid-template-columns:repeat(4,1fr); gap:6px; margin:4px 0 8px; }
+  .nums { display:grid; grid-template-columns:repeat(3,1fr); gap:6px; margin:4px 0 8px; }
   .nums div { border:1px solid var(--line); border-radius:8px; padding:6px 2px; text-align:center; }
   .nums b { display:block; font-size:19px; font-variant-numeric:tabular-nums; }
   .nums span { font-size:11px; color:var(--sub); }
-  canvas.chart { width:100%; height:110px; border:1px solid var(--line); border-radius:8px; display:block; background:#0c0f12; }
+  canvas.chart { width:100%; height:130px; border:1px solid var(--line); border-radius:8px; display:block; background:#0c0f12; }
   .cap { font-size:12px; color:var(--sub); margin:8px 0 3px; }
+  .key b { color:var(--accent); } .key i { color:var(--s2); font-style:normal; font-weight:700; }
   .row2 { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
   .row4 { display:grid; grid-template-columns:repeat(4,1fr); gap:6px; }
-  .row4 button { padding:10px 2px; font-size:14px; }
+  .row4 button, .row2 button.sub { padding:10px 2px; font-size:14px; }
   input[type=range] { width:100%; height:36px; margin:2px 0; accent-color:var(--mark); }
   #pos { font-size:16px; font-weight:700; text-align:center; font-variant-numeric:tabular-nums; margin:2px 0 6px; }
+  details { margin-top:10px; } summary { font-size:13px; color:var(--sub); }
   textarea { height:130px; font-size:12px; font-family:ui-monospace,Menlo,monospace; margin-top:8px; }
   ul.sum { margin:0 0 8px; padding-left:20px; font-size:15px; }
   a { color:var(--accent); }
@@ -53,13 +58,14 @@
 </head>
 <body>
 <main>
-  <h1>海苔 蛍光チェッカー <span class="small">試作 0.4</span></h1>
+  <h1>海苔 蛍光チェッカー <span class="small">試作 0.5</span></h1>
   <p class="small">色の自動調整を止めて録画し、色の変化を数字にします。映像と数字はこのスマホの中だけにあり、保存するまでどこにも送られません。</p>
 
   <div id="stage" hidden>
-    <div id="view">
-      <video id="video" playsinline muted autoplay></video>
-      <img id="still" alt="" hidden>
+    <div id="view"><video id="video" playsinline muted autoplay></video></div>
+    <div id="cmp" hidden>
+      <figure><canvas id="cvRef" width="400" height="400"></canvas><figcaption id="capRef"></figcaption></figure>
+      <figure><canvas id="cvCur" width="400" height="400"></canvas><figcaption id="capCur"></figcaption></figure>
     </div>
     <button id="zoomBtn" class="sub">視野を拡大する</button>
     <div id="zoomMsg" class="msg" hidden></div>
@@ -68,7 +74,7 @@
 
   <section id="cRec" hidden>
     <h2>顕微鏡に合わせて、録画を始める</h2>
-    <p class="small">スマホを顕微鏡に固定し、酸をかける前の海苔にピントを合わせてから押してください。押した瞬間に、色の自動調整を止めます。滴下の時刻は、撮り終えたあとに映像を見ながら決めます。</p>
+    <p class="small">スマホを顕微鏡に固定し、ピントを合わせてから押してください。押した瞬間に、色の自動調整を止めます。滴下（投入）の時刻は、撮り終えたあとに映像を見ながら決めます。</p>
     <button id="rec" class="go">録画と計測を始める</button>
     <div id="recMsg" class="msg" hidden></div>
   </section>
@@ -80,7 +86,7 @@
 
   <section id="cReview" hidden>
     <h2>映像を見て、滴下とアウトを決める</h2>
-    <p class="small">つまみを動かすと、上の映像がその時刻のものに替わります（1秒に4コマ）。</p>
+    <p class="small">左が基準のコマ、右がつまみの位置のコマです。つまみを動かすと右が替わります（1秒に4コマ）。</p>
     <input id="seek" type="range" min="0" max="0" step="1" value="0">
     <div id="pos"></div>
     <div class="row4">
@@ -94,25 +100,31 @@
       <button id="setDrop" class="mark">ここを「滴下」にする</button>
       <button id="setOut" class="mark">ここを「アウト」にする</button>
     </div>
+    <div class="row2">
+      <button id="setRef" class="sub">ここを左の基準にする</button>
+      <button id="enh" class="sub">色の差を広げる：入</button>
+    </div>
     <div id="markState" class="state"></div>
   </section>
 
   <section id="cLive" hidden>
     <h2 id="liveTitle">いま映っているものの数字</h2>
     <div class="nums">
-      <div><b id="nHue">–</b><span>色あい</span></div>
-      <div><b id="nL">–</b><span>明るさ(参考)</span></div>
-      <div><b id="nY">–</b><span>明るい粒 %</span></div>
-      <div><b id="nD">–</b><span>黒い点 %</span></div>
+      <div><b id="nA">–</b><span id="cA">色あい（海苔の真ん中）</span></div>
+      <div><b id="nB">–</b><span id="cB">色あい（黄色寄りの1割）</span></div>
+      <div><b id="nL">–</b><span>明るさ（参考）</span></div>
     </div>
     <p class="small" id="fieldNote"></p>
     <div id="charts" hidden>
-      <p class="cap">色あい（0＝赤、30＝橙、60＝黄。上へ行くほど黄色寄り）</p>
-      <canvas id="chHue" class="chart"></canvas>
-      <p class="cap">明るい粒（まわりより1割以上明るい細かい点）が占める広さ（%）</p>
-      <canvas id="chY" class="chart"></canvas>
-      <p class="cap">明るさ（参考。カメラの自動調整が入ります）</p>
-      <canvas id="chL" class="chart"></canvas>
+      <p class="cap key" id="capShift">基準からどれだけ黄色寄りに動いたか　<b>━ 海苔全体の真ん中</b>　<i>━ いちばん動いた1割</i></p>
+      <canvas id="chShift" class="chart"></canvas>
+      <details id="more">
+        <summary>そのほかの数字（明るさ・明るい粒）</summary>
+        <p class="cap">明るさ（参考。カメラの自動調整が入ります）</p>
+        <canvas id="chL" class="chart"></canvas>
+        <p class="cap">明るい粒（まわりより1割以上明るい細かい点）が占める広さ（%）</p>
+        <canvas id="chY" class="chart"></canvas>
+      </details>
     </div>
   </section>
 
@@ -151,22 +163,27 @@
   var wbLocked = false, lockLost = false, wbAtEnd = '', starting = false;   // wbLocked: colour was held during this run
   var rec = null, chunks = [], recBlob = null, recMime = '';
   var rows = [], tRec0 = 0, tDrop = null, tOut = null, tCand = null, startedAt = null;
-  var sampler = null, wake = null, tick = 0, cur = 0;
+  var tRef = null, refManual = false, base = null, liveBase = null, enhOn = true;
+  var sampler = null, wake = null, tick = 0, cur = 0, paintTok = 0, refTok = 0;
   var box = null, zoomed = false;     // the enlarged view: fixed when the button is pressed, never moves by itself
   var snapBox = null, lastOk = null;  // area kept in the review pictures; last good measurement
   var SINGLE_BACK = ['背面カメラ', 'Back Camera'];
+  var STRETCH = 4, ANCHOR = 14;       // "widen the colour difference": how far, and where the reference colour lands
 
   // ---------- small helpers ----------
   function show(el, text) { el.textContent = text; el.hidden = false; }
   function hide(el) { el.hidden = true; }
   function r1(x) { return Math.round(x * 10) / 10; }
   function r2(x) { return Math.round(x * 100) / 100; }
+  function sg(x) { return (x >= 0 ? '+' : '') + r1(x); }
+  function med(arr) { var s = arr.slice().sort(function (a, b) { return a - b; }); return s.length ? s[Math.floor(s.length / 2)] : null; }
   function getCaps() { try { return (track && track.getCapabilities) ? track.getCapabilities() : {}; } catch (e) { return {}; } }
   function getSettings() { try { return track ? track.getSettings() : {}; } catch (e) { return {}; } }
   function camLabel() { var o = $('cam').selectedOptions && $('cam').selectedOptions[0]; return o ? o.textContent : (track ? track.label : ''); }
   function marks() {
     var m = [];
     if (tDrop !== null) m.push({ t: tDrop, label: '滴下' });
+    if (state === 'done' && tRef !== null) m.push({ t: tRef, label: '基準' });
     if (tOut !== null) m.push({ t: tOut, label: 'アウト' });
     return m;
   }
@@ -182,9 +199,11 @@
     $('charts').hidden = (s !== 'rec' && s !== 'done');
     $('cDone').hidden = (s !== 'done');
     $('clock').hidden = (s !== 'rec');
-    video.hidden = (s === 'done'); $('still').hidden = (s !== 'done'); $('zoomBtn').hidden = (s === 'done' || s === 'idle');
-    applyView();
+    $('view').hidden = (s === 'done'); $('cmp').hidden = (s !== 'done'); $('zoomBtn').hidden = (s === 'done' || s === 'idle');
     $('liveTitle').textContent = (s === 'rec') ? '計測中' : (s === 'done' ? 'つまみの位置の数字' : 'いま映っているものの数字');
+    $('cA').textContent = (s === 'ready') ? '色あい（海苔の真ん中）' : '動き（海苔全体の真ん中）';
+    $('cB').textContent = (s === 'ready') ? '色あい（黄色寄りの1割）' : '動き（いちばん動いた1割）';
+    applyView();
     if (s === 'rec' || s === 'done') sizeCharts();
   }
 
@@ -231,11 +250,9 @@
       if (single && single !== getSettings().deviceId) return start(single);
     }
     if (deviceId) { try { localStorage.setItem('camId', deviceId); } catch (e) {} }
-    // a new camera starts in automatic colour: any earlier lock no longer holds
     wbLocked = false; lockLost = false; box = null; zoomed = false; lastOk = null;
     $('start').textContent = 'カメラを起動し直す'; $('start').className = 'sub';
     setState('ready');
-    applyView();
     if (!sampler) sampler = setInterval(sample, 250);
   }
 
@@ -301,15 +318,11 @@
     var fx = h(X), fy = h(Y), fz = h(Z);
     return [116 * fy - 16, 500 * (fx - fy), 200 * (fy - fz)];
   }
-  function rgb2hue(r, g, b) {
-    var mx = Math.max(r, g, b), mn = Math.min(r, g, b), d = mx - mn, h;
-    if (d < 1e-6) return 0;
-    if (mx === r) h = ((g - b) / d) % 6; else if (mx === g) h = (b - r) / d + 2; else h = (r - g) / d + 4;
-    h *= 60; if (h < 0) h += 360;
-    return h;
-  }
 
-  // One frame -> numbers. "Field" is the lit circle seen through the eyepiece.
+  // One frame -> numbers.
+  //  "field": the lit area seen through the eyepiece (used to place the enlarged view).
+  //  "nori":  the brightly glowing red-to-yellow pixels; their colour spread is what we follow.
+  //  Colour is measured as hue in degrees: 0 = red, 30 = orange, 60 = yellow.
   function analyze() {
     if (!setupCanvases()) return null;
     actx.drawImage(video, 0, 0, AW, AH);
@@ -318,31 +331,42 @@
     bctx.imageSmoothingEnabled = true;
     bctx.drawImage(src, 0, 0, AW, AH);
     var a = actx.getImageData(0, 0, AW, AH).data, b = bctx.getImageData(0, 0, AW, AH).data;
-    var n = AW * AH, N4 = n * 4, i, bv, v, x, y;
-    var hist = new Uint32Array(256);
-    for (i = 0; i < N4; i += 4) { bv = b[i] > b[i + 1] ? b[i] : b[i + 1]; if (b[i + 2] > bv) bv = b[i + 2]; hist[bv]++; }
+    var n = AW * AH, N4 = n * 4, i, bv, v, x, y, r, g, bl;
+    var hist = new Uint32Array(256), hv = new Uint32Array(256);
+    for (i = 0; i < N4; i += 4) {
+      bv = b[i] > b[i + 1] ? b[i] : b[i + 1]; if (b[i + 2] > bv) bv = b[i + 2]; hist[bv]++;
+      v = a[i] > a[i + 1] ? a[i] : a[i + 1]; if (a[i + 2] > v) v = a[i + 2]; hv[v]++;
+    }
     var acc = 0, p95 = 255, need = n * 0.05;
     for (i = 255; i >= 0; i--) { acc += hist[i]; if (acc >= need) { p95 = i; break; } }
-    var thr = Math.max(12, 0.5 * p95);
-    var field = 0, dark = 0, yel = 0, sr = 0, sg = 0, sb = 0, clip = 0, sx = 0, sy = 0;
+    var p995 = 255; acc = 0; need = n * 0.005;
+    for (i = 255; i >= 0; i--) { acc += hv[i]; if (acc >= need) { p995 = i; break; } }
+    var thr = Math.max(12, 0.5 * p95), nthr = Math.max(50, 0.55 * p995);
+    var field = 0, dark = 0, yel = 0, sr = 0, sg2 = 0, sb = 0, clip = 0, sx = 0, sy = 0;
+    var HB = 280, hh = new Uint32Array(HB), nori = 0, nr = 0, ng = 0, nb = 0;     // hue bins of 0.25 degree, 0..70
     i = 0;
     for (y = 0; y < AH; y++) {
       for (x = 0; x < AW; x++, i += 4) {
+        r = a[i]; g = a[i + 1]; bl = a[i + 2];
+        v = r > g ? r : g; if (bl > v) v = bl;
+        if (v > nthr && r > g && g >= bl) {
+          var hq = Math.floor(240 * (g - bl) / (r - bl));          // hue * 4
+          hh[hq < HB ? hq : HB - 1]++; nori++; nr += r; ng += g; nb += bl;
+        }
         bv = b[i] > b[i + 1] ? b[i] : b[i + 1]; if (b[i + 2] > bv) bv = b[i + 2];
         if (bv <= thr) continue;
         field++; sx += x; sy += y;
-        var r = a[i], g = a[i + 1], bl = a[i + 2];
-        sr += r; sg += g; sb += bl;
-        v = r > g ? r : g; if (bl > v) v = bl;
+        sr += r; sg2 += g; sb += bl;
         if (v >= 250) clip++;
         if (v < 0.80 * bv) dark++;
         else if (v > 1.10 * bv) yel++;   // a fine point at least 10% brighter than its surroundings
       }
     }
-    if (field < n * 0.02) return { ok: false, field: field / n };
-    var R = sr / field, G = sg / field, B = sb / field, lab = rgb2lab(R, G, B);
-    return { ok: true, field: field / n, cx: sx / field / AW, cy: sy / field / AH,
-             R: R, G: G, B: B, hue: rgb2hue(R, G, B), L: lab[0], a: lab[1], b: lab[2],
+    if (field < n * 0.02 || nori < n * 0.005) return { ok: false, field: field / n, nori: nori / n };
+    var pct = function (q) { var need2 = nori * q, c = 0; for (var k = 0; k < HB; k++) { c += hh[k]; if (c >= need2) return (k + 0.5) / 4; } return HB / 4; };
+    var R = nr / nori, G = ng / nori, B = nb / nori, lab = rgb2lab(R, G, B);
+    return { ok: true, field: field / n, nori: nori / n, cx: sx / field / AW, cy: sy / field / AH,
+             R: R, G: G, B: B, L: lab[0], h10: pct(0.10), h50: pct(0.50), h90: pct(0.90),
              yellow: 100 * yel / field, dark: 100 * dark / field, clip: 100 * clip / field };
   }
 
@@ -359,8 +383,7 @@
   }
   function applyView() {
     var vw = video.videoWidth, vh = video.videoHeight, v = $('view');
-    if (!vw || !vh) return;
-    if (state === 'done') { v.style.aspectRatio = '1 / 1'; v.style.width = 'min(100%, 44vh)'; return; }
+    if (!vw || !vh || state === 'done') return;
     if (zoomed && box) {
       var b = clampBox(box), side = 2 * b.half;
       v.style.aspectRatio = '1 / 1'; v.style.width = 'min(100%, 44vh)';
@@ -383,20 +406,41 @@
     var b = snapBox || clampBox(null);
     try {
       snapX.drawImage(video, b.cx - b.half, b.cy - b.half, 2 * b.half, 2 * b.half, 0, 0, SN, SN);
-      if (snapC.toBlob) snapC.toBlob(function (bl) { if (bl) row.snap = URL.createObjectURL(bl); }, 'image/jpeg', 0.72);
-      else row.snap = snapC.toDataURL('image/jpeg', 0.72);
+      snapC.toBlob(function (bl) { if (bl) row.blob = bl; }, 'image/jpeg', 0.75);
     } catch (e) {}
   }
 
+  // ---------- reference and "how far it moved toward yellow" ----------
+  function baseAt(t) {
+    var w = rows.filter(function (r) { return r.m.ok && Math.abs(r.t - t) <= 1.25; });
+    if (!w.length) return null;
+    return { h50: med(w.map(function (r) { return r.m.h50; })), h90: med(w.map(function (r) { return r.m.h90; })) };
+  }
+  function curBase() { return state === 'done' ? base : liveBase; }
+  function s50(r) { var b = curBase(); return (b && r.m.ok) ? r.m.h50 - b.h50 : null; }
+  function s90(r) { var b = curBase(); return (b && r.m.ok) ? r.m.h90 - b.h90 : null; }
+  function defaultRef() {
+    if (!rows.length) return 0;
+    var t = (tDrop !== null ? tDrop : rows[0].t) + 4;      // a few seconds after the drop, once the picture has settled
+    return Math.min(t, rows[rows.length - 1].t);
+  }
+  function setRef(t, manual) {
+    tRef = rows.length ? rows[indexAt(t)].t : t; refManual = !!manual;
+    base = baseAt(tRef);
+    paintRef();
+  }
+
   // ---------- sampling loop ----------
-  function showNums(m) {
+  function showNums(row) {
+    var m = row && row.m;
     if (m && m.ok) {
-      $('nHue').textContent = r1(m.hue); $('nL').textContent = Math.round(m.L);
-      $('nY').textContent = r1(m.yellow); $('nD').textContent = r1(m.dark);
-      $('fieldNote').textContent = '光っている視野は画面の ' + Math.round(m.field * 100) + '% 。' + (m.clip > 2 ? '明るすぎて色が飛んでいる所が ' + Math.round(m.clip) + '% あります。' : '');
+      if (state === 'ready') { $('nA').textContent = r1(m.h50); $('nB').textContent = r1(m.h90); }
+      else { var a = s50(row), b = s90(row); $('nA').textContent = a === null ? '–' : sg(a); $('nB').textContent = b === null ? '–' : sg(b); }
+      $('nL').textContent = Math.round(m.L);
+      $('fieldNote').textContent = '海苔として見ている広さは画面の ' + Math.round(m.nori * 100) + '% 。' + (m.clip > 2 ? '明るすぎて色が飛んでいる所が ' + Math.round(m.clip) + '% あります。' : '');
     } else {
-      $('nHue').textContent = $('nL').textContent = $('nY').textContent = $('nD').textContent = '–';
-      $('fieldNote').textContent = '光っている視野が見つかりません。';
+      $('nA').textContent = $('nB').textContent = $('nL').textContent = '–';
+      $('fieldNote').textContent = '光っている海苔が見つかりません。';
     }
   }
   function sample() {
@@ -406,14 +450,15 @@
     var m; try { m = analyze(); } catch (e) { return; }
     if (!m) return;
     if (m.ok) lastOk = m;
-    showNums(m);
+    var row = { t: state === 'rec' ? (performance.now() - tRec0) / 1000 : 0, m: m, blob: null };
     if (state === 'rec') {
-      var row = { t: (performance.now() - tRec0) / 1000, m: m, snap: null };
       rows.push(row); takeSnap(row);
+      if (!liveBase && row.t >= 7) liveBase = baseAt(4.5);          // provisional zero while recording
       $('clock').textContent = '録画 ' + row.t.toFixed(1) + ' 秒';
       drawCharts(row.t, null);
       if (tick % 8 === 0) checkLock();
     }
+    showNums(row);
   }
   function checkLock() {
     if (!wbLocked || lockLost) return;
@@ -425,8 +470,9 @@
   }
 
   // ---------- charts ----------
+  var CHARTS = ['chShift', 'chL', 'chY'];
   function sizeCharts() {
-    ['chHue', 'chY', 'chL'].forEach(function (id) {
+    CHARTS.forEach(function (id) {
       var c = $(id), dpr = window.devicePixelRatio || 1, w = c.clientWidth, h = c.clientHeight;
       if (!w) return;
       c.width = Math.round(w * dpr); c.height = Math.round(h * dpr);
@@ -434,12 +480,14 @@
     });
     if (rows.length) drawCharts(rows[rows.length - 1].t, state === 'done' ? rows[cur].t : null);
   }
-  function drawOne(id, key, lo, hi, tMax, cursor) {
+  function drawOne(id, series, lo, hi, tMax, cursor, tFrom) {
     var c = $(id), w = c.clientWidth, h = c.clientHeight; if (!w) return;
     var x = c.getContext('2d');
     x.clearRect(0, 0, w, h);
-    var vals = rows.filter(function (r) { return r.m.ok; }).map(function (r) { return r.m[key]; });
-    if (vals.length) { hi = Math.max(hi, Math.max.apply(null, vals) * 1.1); lo = Math.min(lo, Math.min.apply(null, vals)); }
+    series.forEach(function (s) {
+      rows.forEach(function (r) { var v = s.fn(r); if (v === null || r.t < (tFrom || 0)) return; if (v > hi) hi = v; if (v < lo) lo = v; });   // the scale ignores what came before the reference
+    });
+    hi += (hi - lo) * 0.06;
     var X = function (t) { return 34 + t / tMax * (w - 40); };
     var Y = function (v) { return h - 14 - (v - lo) / (hi - lo) * (h - 22); };
     x.font = '10px sans-serif'; x.fillStyle = '#9ba6b3'; x.strokeStyle = '#2d353f'; x.lineWidth = 1;
@@ -447,26 +495,34 @@
       x.beginPath(); x.moveTo(34, Y(v)); x.lineTo(w - 6, Y(v)); x.stroke();
       x.fillText(String(Math.round(v * 10) / 10), 2, Y(v) + 3);
     });
+    if (lo < 0 && hi > 0) { x.strokeStyle = '#5b6674'; x.beginPath(); x.moveTo(34, Y(0)); x.lineTo(w - 6, Y(0)); x.stroke(); }
     x.fillText('0', 34, h - 2); x.fillText(Math.round(tMax) + '秒', w - 34, h - 2);
     x.setLineDash([4, 3]); x.strokeStyle = '#f0c04c'; x.fillStyle = '#f0c04c';
     marks().forEach(function (m) {
       x.beginPath(); x.moveTo(X(m.t), 4); x.lineTo(X(m.t), h - 14); x.stroke();
       x.fillText(m.label, Math.min(X(m.t) + 3, w - 30), 12);
     });
-    x.setLineDash([]); x.strokeStyle = '#4c9cf0'; x.lineWidth = 2; x.beginPath();
-    var on = false;
-    rows.forEach(function (r) {
-      if (!r.m.ok) { on = false; return; }
-      if (!on) { x.moveTo(X(r.t), Y(r.m[key])); on = true; } else x.lineTo(X(r.t), Y(r.m[key]));
+    x.setLineDash([]); x.lineWidth = 2;
+    x.save(); x.beginPath(); x.rect(34, 2, w - 40, h - 16); x.clip();
+    series.forEach(function (s) {
+      x.strokeStyle = s.color; x.beginPath();
+      var on = false;
+      rows.forEach(function (r) {
+        var v = s.fn(r);
+        if (v === null) { on = false; return; }
+        if (!on) { x.moveTo(X(r.t), Y(v)); on = true; } else x.lineTo(X(r.t), Y(v));
+      });
+      x.stroke();
     });
-    x.stroke();
+    x.restore();
     if (cursor !== null) { x.strokeStyle = '#ffffff'; x.lineWidth = 1.5; x.beginPath(); x.moveTo(X(cursor), 2); x.lineTo(X(cursor), h - 14); x.stroke(); }
   }
   function drawCharts(t, cursor) {
     var tMax = Math.max(30, t * 1.03);
-    drawOne('chHue', 'hue', 10, 40, tMax, cursor);
-    drawOne('chY', 'yellow', 0, 5, tMax, cursor);
-    drawOne('chL', 'L', 0, 50, tMax, cursor);
+    var from = (state === 'done' && tRef !== null) ? tRef - 1.5 : (liveBase ? 3 : 0);
+    drawOne('chShift', [{ fn: s90, color: '#f08a4c' }, { fn: s50, color: '#4c9cf0' }], -1, 6, tMax, cursor, from);
+    drawOne('chL', [{ fn: function (r) { return r.m.ok ? r.m.L : null; }, color: '#4c9cf0' }], 0, 50, tMax, cursor);
+    drawOne('chY', [{ fn: function (r) { return r.m.ok ? r.m.yellow : null; }, color: '#4c9cf0' }], 0, 5, tMax, cursor);
   }
 
   // ---------- recording ----------
@@ -477,8 +533,8 @@
     return '';
   }
   function clearRun() {
-    rows.forEach(function (r) { if (r.snap && r.snap.indexOf('blob:') === 0) { try { URL.revokeObjectURL(r.snap); } catch (e) {} } });
     rows = []; chunks = []; recBlob = null; tDrop = null; tOut = null; tCand = null; cur = 0;
+    tRef = null; refManual = false; base = null; liveBase = null;
   }
 
   async function startRec() {
@@ -513,12 +569,57 @@
     finish();
   }
 
+  // ---------- review pictures ----------
+  function loadSnap(row) {
+    if (!row || !row.blob) return Promise.resolve(null);
+    if (window.createImageBitmap) return createImageBitmap(row.blob).catch(function () { return null; });
+    return new Promise(function (res) {
+      var u = URL.createObjectURL(row.blob), im = new Image();
+      im.onload = function () { URL.revokeObjectURL(u); res(im); };
+      im.onerror = function () { URL.revokeObjectURL(u); res(null); };
+      im.src = u;
+    });
+  }
+  // Spread the red-to-yellow range wider so a small colour change becomes visible.
+  // Only the glowing nori pixels are recoloured; brightness and vividness are kept.
+  function widen(ctx) {
+    if (!base) return;
+    var im = ctx.getImageData(0, 0, SN, SN), d = im.data, i, r, g, b, v;
+    var hv = new Uint32Array(256);
+    for (i = 0; i < d.length; i += 4) { v = d[i] > d[i + 1] ? d[i] : d[i + 1]; if (d[i + 2] > v) v = d[i + 2]; hv[v]++; }
+    var acc = 0, p995 = 255, need = d.length / 4 * 0.005;
+    for (i = 255; i >= 0; i--) { acc += hv[i]; if (acc >= need) { p995 = i; break; } }
+    var thr = Math.max(50, 0.55 * p995);          // the same pixels that are measured
+    for (i = 0; i < d.length; i += 4) {
+      r = d[i]; g = d[i + 1]; b = d[i + 2];
+      if (r <= thr || r <= g || g < b) continue;
+      var h = 60 * (g - b) / (r - b);
+      var h2 = ANCHOR + (h - base.h50) * STRETCH; if (h2 < 0) h2 = 0; if (h2 > 70) h2 = 70;
+      if (h2 <= 60) { d[i + 1] = b + (r - b) * h2 / 60; }
+      else { d[i + 1] = r; d[i] = b + (r - b) * (120 - h2) / 60; }
+    }
+    ctx.putImageData(im, 0, 0);
+  }
+  async function paintCur() {
+    var tok = ++paintTok, im = await loadSnap(rows[cur]);
+    if (tok !== paintTok || !im) return;
+    var x = $('cvCur').getContext('2d', { willReadFrequently: true });
+    x.drawImage(im, 0, 0, SN, SN); if (enhOn) widen(x);
+  }
+  async function paintRef() {
+    if (!rows.length || tRef === null) return;
+    var tok = ++refTok, im = await loadSnap(rows[indexAt(tRef)]);
+    if (tok !== refTok || !im) return;
+    var x = $('cvRef').getContext('2d', { willReadFrequently: true });
+    x.drawImage(im, 0, 0, SN, SN); if (enhOn) widen(x);
+    $('capRef').textContent = '基準　' + tRef.toFixed(1) + ' 秒';
+  }
+
   // ---------- review: choose drop and out on the pictures ----------
   // The picture shakes when the liquid lands: offer the first big jump as a candidate.
   function findDropCandidate() {
     var ok = rows.filter(function (r) { return r.m.ok; });
     if (ok.length < 16) return null;
-    var med = function (arr) { var s = arr.slice().sort(function (a, b) { return a - b; }); return s[Math.floor(s.length / 2)]; };
     var dev = [];
     for (var i = 8; i < ok.length; i++) {
       var w = ok.slice(i - 8, i), m = ok[i].m;
@@ -527,7 +628,7 @@
            + 2 * Math.abs(m.yellow - med(w.map(function (r) { return r.m.yellow; }))) + 100 * Math.abs(m.field - med(w.map(function (r) { return r.m.field; }))) });
     }
     var ds = dev.map(function (x) { return x.d; }).sort(function (a, b) { return a - b; });
-    var calm = ds[Math.floor(ds.length * 0.2)];          // the quiet level: after the drop the picture keeps changing, so do not use the middle value
+    var calm = ds[Math.floor(ds.length * 0.2)];
     var thr = Math.max(10, 5 * calm);
     for (var j = 0; j < dev.length; j++) if (dev[j].d > thr) return dev[j].t;
     return null;
@@ -542,9 +643,10 @@
     cur = Math.max(0, Math.min(rows.length - 1, i));
     $('seek').value = String(cur);
     var r = rows[cur];
-    if (r.snap) $('still').src = r.snap;
+    paintCur();
+    $('capCur').textContent = 'いま　' + r.t.toFixed(1) + ' 秒';
     $('pos').textContent = '録画の頭から ' + r.t.toFixed(2) + ' 秒' + (tDrop !== null ? '　／　滴下から ' + (r.t - tDrop).toFixed(2) + ' 秒' : '');
-    showNums(r.m);
+    showNums(r);
     drawCharts(rows[rows.length - 1].t, r.t);
   }
   function renderMarks() {
@@ -553,6 +655,7 @@
     parts.push(tOut !== null ? 'アウト： ' + (tDrop !== null ? '滴下から ' + (tOut - tDrop).toFixed(2) + ' 秒' : '録画の頭から ' + tOut.toFixed(2) + ' 秒') : 'アウト： まだ決めていません');
     $('markState').textContent = parts.join('　｜　');
     $('markState').className = (tDrop !== null && tOut !== null) ? 'state ok' : 'state';
+    $('capShift').firstChild.textContent = '基準（' + (tRef !== null ? tRef.toFixed(1) + '秒' : '–') + '）からどれだけ黄色寄りに動いたか　';
     renderSummary();
     goTo(cur);
   }
@@ -577,43 +680,45 @@
       '色の調整: ' + (wbLocked ? (lockLost ? '録画中は固定（途中で外れた）' : '録画中は固定') : '自動のまま（止められなかった）') + ' / 終了時の値=' + (wbAtEnd || '不明'),
       '滴下（映像で決めた時刻）: ' + (tDrop !== null ? r2(tDrop) + '秒' : '未設定'),
       'アウト（映像で決めた時刻）: ' + (tOut !== null ? r2(tOut) + '秒' + (tDrop !== null ? '（滴下から' + r2(tOut - tDrop) + '秒）' : '') : '未設定'),
+      '基準のコマ: ' + (tRef !== null ? r2(tRef) + '秒' + (refManual ? '（手で選んだ）' : '（滴下の4秒後）') : 'なし') + (base ? ' / 基準の色あい 真ん中' + r1(base.h50) + '・黄色寄り1割' + r1(base.h90) : ''),
       '揺れから見た滴下の候補: ' + (tCand !== null ? r2(tCand) + '秒' : 'なし'),
       'ブラウザ: ' + navigator.userAgent
     ];
   }
   function buildCsv() {
     var out = metaLines().map(function (l) { return '# ' + l; });
-    out.push('t_sec,t_from_drop_sec,field_pct,R,G,B,hue,L,a,b,speck_pct,dark_pct,clip_pct,mark');
-    var iDrop = tDrop !== null ? indexAt(tDrop) : -1, iOut = tOut !== null ? indexAt(tOut) : -1;
+    out.push('t_sec,t_from_drop_sec,nori_pct,hue_p10,hue_p50,hue_p90,shift_p50,shift_p90,L,R,G,B,speck_pct,dark_pct,clip_pct,mark');
+    var iDrop = tDrop !== null ? indexAt(tDrop) : -1, iOut = tOut !== null ? indexAt(tOut) : -1, iRef = tRef !== null ? indexAt(tRef) : -1;
     rows.forEach(function (r, i) {
-      var mk = [i === iDrop ? '滴下' : '', i === iOut ? 'アウト' : ''].filter(Boolean).join('/');
-      var m = r.m, td = (tDrop === null) ? '' : r2(r.t - tDrop);
+      var mk = [i === iDrop ? '滴下' : '', i === iRef ? '基準' : '', i === iOut ? 'アウト' : ''].filter(Boolean).join('/');
+      var m = r.m, td = (tDrop === null) ? '' : r2(r.t - tDrop), a = s50(r), b = s90(r);
       out.push(m.ok
-        ? [r2(r.t), td, r1(m.field * 100), r1(m.R), r1(m.G), r1(m.B), r2(m.hue), r1(m.L), r1(m.a), r1(m.b), r2(m.yellow), r2(m.dark), r1(m.clip), mk].join(',')
-        : [r2(r.t), td, r1(m.field * 100), '', '', '', '', '', '', '', '', '', '', mk].join(','));
+        ? [r2(r.t), td, r1(m.nori * 100), r2(m.h10), r2(m.h50), r2(m.h90), a === null ? '' : r2(a), b === null ? '' : r2(b), r1(m.L), r1(m.R), r1(m.G), r1(m.B), r2(m.yellow), r2(m.dark), r1(m.clip), mk].join(',')
+        : [r2(r.t), td, r1((m.nori || 0) * 100), '', '', '', '', '', '', '', '', '', '', '', '', mk].join(','));
     });
     return '﻿' + out.join('\r\n');
   }
   function buildReport() {
     var per = rows.filter(function (r, i) { return i % 4 === 0 && r.m.ok; }).map(function (r) {
-      var m = r.m; return Math.round(r.t) + ':' + r1(m.hue) + '/' + Math.round(m.L) + '/' + r1(m.yellow) + '/' + r1(m.dark) + '/' + Math.round(m.R) + '/' + Math.round(m.G) + '/' + Math.round(m.B);
+      var m = r.m, a = s50(r), b = s90(r);
+      return Math.round(r.t) + ':' + (a === null ? '' : r1(a)) + '/' + (b === null ? '' : r1(b)) + '/' + r1(m.h50) + '/' + Math.round(m.L) + '/' + Math.round(m.R) + '/' + Math.round(m.G) + '/' + Math.round(m.B);
     });
     return ['=== 海苔 蛍光チェッカー 結果 ==='].concat(metaLines())
       .concat(['動画: ' + (recBlob ? (recBlob.size / 1048576).toFixed(1) + 'MB ' + recBlob.type : 'なし'),
-               '毎秒の値（秒:色あい/明るさ/明るい粒%/黒い点%/赤/緑/青）:', per.join(' ')]).join('\n');
+               '毎秒の値（秒:全体の動き/1割の動き/色あい真ん中/明るさ/赤/緑/青）:', per.join(' ')]).join('\n');
   }
   function renderSummary() {
     var tEnd = rows.length ? rows[rows.length - 1].t : 0, li = [];
     li.push('記録した時間： ' + r1(tEnd) + ' 秒');
     if (tDrop !== null && tOut !== null) li.push('滴下からアウトまで： ' + r2(tOut - tDrop) + ' 秒');
-    var pts = [['始め', rows.length ? rows[0].t : 0]];
-    if (tDrop !== null) pts.push(['滴下', tDrop]);
+    var pts = [];
     if (tOut !== null) pts.push(['アウト', tOut]);
     pts.push(['終わり', tEnd]);
-    var hues = pts.map(function (p) { var r = nearest(p[1]); return r ? p[0] + ' ' + r1(r.m.hue) : null; }).filter(Boolean);
-    if (hues.length) li.push('色あい： ' + hues.join(' → '));
-    var ok = rows.filter(function (r) { return r.m.ok; });
-    if (ok.length) li.push('明るい粒： 最大 ' + r1(Math.max.apply(null, ok.map(function (r) { return r.m.yellow; }))) + ' %　／　黒い点： 最大 ' + r1(Math.max.apply(null, ok.map(function (r) { return r.m.dark; }))) + ' %');
+    var line = function (fn) { return pts.map(function (p) { var r = nearest(p[1]), v = r ? fn(r) : null; return v === null ? null : p[0] + ' ' + sg(v); }).filter(Boolean).join(' → '); };
+    if (base) {
+      li.push('黄色寄りへの動き（海苔全体の真ん中）： ' + line(s50));
+      li.push('黄色寄りへの動き（いちばん動いた1割）： ' + line(s90));
+    }
     if (!wbLocked) li.push('色の自動調整を止められなかった記録です');
     if (lockLost) li.push('途中で色の固定が外れました');
     li.push(recBlob ? '動画： ' + (recBlob.size / 1048576).toFixed(1) + ' MB' : '動画： なし');
@@ -633,8 +738,7 @@
     $('saveVideo').hidden = !recBlob;
     hide($('copyMsg'));
     cur = (tCand !== null) ? indexAt(tCand) : 0;
-    renderMarks();
-    setTimeout(function () { goTo(cur); }, 300);        // the last pictures may still be finishing
+    setTimeout(function () { setRef(defaultRef(), false); renderMarks(); }, 300);   // the last pictures may still be finishing
   }
 
   function saveBlob(blob, name) {
@@ -659,8 +763,19 @@
   $('seek').addEventListener('input', function () { goTo(parseInt($('seek').value, 10) || 0); });
   [['b-4', -4], ['b-1', -1], ['b1', 1], ['b4', 4]].forEach(function (p) { $(p[0]).addEventListener('click', function () { goTo(cur + p[1]); }); });
   $('jump').addEventListener('click', function () { if (tCand !== null) goTo(indexAt(tCand)); });
-  $('setDrop').addEventListener('click', function () { if (rows.length) { tDrop = rows[cur].t; renderMarks(); } });
+  $('setDrop').addEventListener('click', function () {
+    if (!rows.length) return;
+    tDrop = rows[cur].t;
+    if (!refManual) setRef(defaultRef(), false);          // the reference follows the drop unless it was chosen by hand
+    renderMarks();
+  });
   $('setOut').addEventListener('click', function () { if (rows.length) { tOut = rows[cur].t; renderMarks(); } });
+  $('setRef').addEventListener('click', function () { if (rows.length) { setRef(rows[cur].t, true); renderMarks(); } });
+  $('enh').addEventListener('click', function () {
+    enhOn = !enhOn; $('enh').textContent = '色の差を広げる：' + (enhOn ? '入' : '切');
+    paintRef(); paintCur();
+  });
+  $('more').addEventListener('toggle', sizeCharts);
   $('saveVideo').addEventListener('click', function () {
     if (recBlob) saveBlob(recBlob, baseName() + (recBlob.type.indexOf('webm') >= 0 ? '.webm' : '.mp4'));
   });
@@ -672,8 +787,8 @@
     if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(ta.value).then(done, manual); else manual();
   });
   $('next').addEventListener('click', function () {
-    clearRun(); $('memo').value = ''; $('still').removeAttribute('src');
-    setState('ready'); applyView(); window.scrollTo(0, 0);
+    clearRun(); $('memo').value = '';
+    setState('ready'); window.scrollTo(0, 0);
   });
   $('memo').addEventListener('input', function () { $('report').value = buildReport(); });
   video.addEventListener('loadedmetadata', applyView);

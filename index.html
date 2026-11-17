@@ -6,7 +6,7 @@
 <title>海苔 蛍光チェッカー（試作）</title>
 <style>
   :root { --bg:#101317; --card:#1a1f25; --line:#2d353f; --ink:#e9ecf0; --sub:#9ba6b3;
-          --accent:#4c9cf0; --go:#2e9e68; --stop:#d5534e; --warn:#e3a53c; --mark:#f0c04c; }
+          --accent:#4c9cf0; --go:#2e9e68; --stop:#d5534e; --mark:#f0c04c; }
   * { box-sizing:border-box; }
   body { margin:0; padding:0 12px 56px; background:var(--bg); color:var(--ink);
          font-family:"Hiragino Sans","Hiragino Kaku Gothic ProN","Noto Sans JP","Yu Gothic",sans-serif;
@@ -21,15 +21,15 @@
            background:var(--accent); color:#06121f; width:100%; margin:4px 0; }
   button.sub { background:transparent; color:var(--accent); }
   button.go { background:var(--go); border-color:var(--go); color:#04140c; }
-  button.stop { background:var(--stop); border-color:var(--stop); color:#fff; }
-  button.mark { background:var(--mark); border-color:var(--mark); color:#231a02; font-size:18px; padding:18px 12px; }
-  button.done { opacity:.75; }
+  button.stop { background:var(--stop); border-color:var(--stop); color:#fff; font-size:18px; padding:16px 12px; }
+  button.mark { background:var(--mark); border-color:var(--mark); color:#231a02; }
   select, input[type=text], textarea { font:inherit; width:100%; padding:10px; border-radius:10px; border:1px solid var(--line);
            background:#0c0f12; color:var(--ink); }
   #stage { position:sticky; top:0; z-index:5; background:var(--bg); padding-top:8px; }
-  video { width:100%; max-height:36vh; background:#000; border-radius:10px; display:block; object-fit:contain; }
-  #clock { font-size:22px; font-weight:700; text-align:center; padding:6px 0 4px; font-variant-numeric:tabular-nums; }
-  #clock small { font-size:13px; font-weight:400; color:var(--sub); display:block; }
+  #view { position:relative; width:min(100%, 44vh); aspect-ratio:1 / 1; margin:0 auto; overflow:hidden; border-radius:10px; background:#000; }
+  #view video { position:absolute; left:0; top:0; width:100%; height:auto; max-width:none; transition:width .35s, left .35s, top .35s; }
+  #view img { position:absolute; left:0; top:0; width:100%; height:100%; object-fit:cover; }
+  #clock { font-size:20px; font-weight:700; text-align:center; padding:6px 0 4px; font-variant-numeric:tabular-nums; }
   .msg { font-size:14px; padding:8px 10px; border-radius:8px; background:#3a2c0d; color:#f3d48a; margin:8px 0 0; }
   .state { font-size:14px; padding:8px 10px; border-radius:8px; background:#0f2337; color:#a9d0f7; margin:8px 0 0; }
   .state.ok { background:#0f2b1e; color:#9fe0bd; }
@@ -40,6 +40,10 @@
   canvas.chart { width:100%; height:110px; border:1px solid var(--line); border-radius:8px; display:block; background:#0c0f12; }
   .cap { font-size:12px; color:var(--sub); margin:8px 0 3px; }
   .row2 { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+  .row4 { display:grid; grid-template-columns:repeat(4,1fr); gap:6px; }
+  .row4 button { padding:10px 2px; font-size:14px; }
+  input[type=range] { width:100%; height:36px; margin:2px 0; accent-color:var(--mark); }
+  #pos { font-size:16px; font-weight:700; text-align:center; font-variant-numeric:tabular-nums; margin:2px 0 6px; }
   textarea { height:130px; font-size:12px; font-family:ui-monospace,Menlo,monospace; margin-top:8px; }
   ul.sum { margin:0 0 8px; padding-left:20px; font-size:15px; }
   a { color:var(--accent); }
@@ -48,11 +52,14 @@
 </head>
 <body>
 <main>
-  <h1>海苔 蛍光チェッカー <span class="small">試作 0.1</span></h1>
+  <h1>海苔 蛍光チェッカー <span class="small">試作 0.2</span></h1>
   <p class="small">色の自動調整を止めて録画し、色の変化を数字にします。映像と数字はこのスマホの中だけにあり、保存するまでどこにも送られません。</p>
 
   <div id="stage" hidden>
-    <video id="video" playsinline muted autoplay></video>
+    <div id="view">
+      <video id="video" playsinline muted autoplay></video>
+      <img id="still" alt="" hidden>
+    </div>
     <div id="clock" hidden></div>
   </div>
 
@@ -77,17 +84,34 @@
 
   <section id="cRec" hidden>
     <h2>3. 顕微鏡に合わせて、録画を始める</h2>
-    <p class="small">酸をかける前の海苔にピントを合わせてから始めます。</p>
+    <p class="small">酸をかける前の海苔にピントを合わせてから始めます。上の映像は、光っている視野のところだけを大きく映しています。滴下の時刻は、撮り終えたあとに映像を見ながら決めます。</p>
     <input id="memo" type="text" placeholder="メモ（海苔や液の名前など。あとでファイル名になります）" autocomplete="off">
     <button id="rec" class="go" style="margin-top:8px">録画と計測を始める</button>
     <div id="recMsg" class="msg" hidden></div>
   </section>
 
   <section id="cRun" hidden>
-    <button id="drop" class="mark">滴下した</button>
-    <button id="out" class="mark">目で見て「アウト」</button>
     <button id="stop" class="stop">終わる</button>
     <div id="runMsg" class="msg" hidden></div>
+  </section>
+
+  <section id="cReview" hidden>
+    <h2>4. 映像を見て、滴下とアウトを決める</h2>
+    <p class="small">つまみを動かすと、上の映像がその時刻のものに替わります（1秒に4コマ）。</p>
+    <input id="seek" type="range" min="0" max="0" step="1" value="0">
+    <div id="pos"></div>
+    <div class="row4">
+      <button id="b-4" class="sub">◀ 1秒</button>
+      <button id="b-1" class="sub">◀ 1コマ</button>
+      <button id="b1" class="sub">1コマ ▶</button>
+      <button id="b4" class="sub">1秒 ▶</button>
+    </div>
+    <button id="jump" class="sub" hidden></button>
+    <div class="row2">
+      <button id="setDrop" class="mark">ここを「滴下」にする</button>
+      <button id="setOut" class="mark">ここを「アウト」にする</button>
+    </div>
+    <div id="markState" class="state"></div>
   </section>
 
   <section id="cLive" hidden>
@@ -110,7 +134,7 @@
   </section>
 
   <section id="cDone" hidden>
-    <h2>4. 保存する</h2>
+    <h2>5. 保存する</h2>
     <ul class="sum" id="summary"></ul>
     <button id="saveVideo">動画を保存する</button>
     <button id="saveCsv">数字の表（CSV）を保存する</button>
@@ -132,8 +156,9 @@
   var state = 'idle';                 // idle / ready / rec / done
   var wbLocked = false, whiteRef = null, lockLost = false;
   var rec = null, chunks = [], recBlob = null, recMime = '';
-  var rows = [], marks = [], tRec0 = 0, tDrop = null, tOut = null, startedAt = null, recArmed = false;
-  var sampler = null, wake = null, tick = 0;
+  var rows = [], tRec0 = 0, tDrop = null, tOut = null, tCand = null, startedAt = null, recArmed = false;
+  var sampler = null, wake = null, tick = 0, cur = 0;
+  var box = null;                     // lit field in video pixels: {cx, cy, half}
   var SINGLE_BACK = ['背面カメラ', 'Back Camera'];
 
   // ---------- small helpers ----------
@@ -144,6 +169,12 @@
   function getCaps() { try { return (track && track.getCapabilities) ? track.getCapabilities() : {}; } catch (e) { return {}; } }
   function getSettings() { try { return track ? track.getSettings() : {}; } catch (e) { return {}; } }
   function camLabel() { var o = $('cam').selectedOptions && $('cam').selectedOptions[0]; return o ? o.textContent : (track ? track.label : ''); }
+  function marks() {
+    var m = [];
+    if (tDrop !== null) m.push({ t: tDrop, label: '滴下' });
+    if (tOut !== null) m.push({ t: tOut, label: 'アウト' });
+    return m;
+  }
 
   function setState(s) {
     state = s;
@@ -152,11 +183,13 @@
     $('cLock').hidden = (s !== 'ready');
     $('cRec').hidden = (s !== 'ready');
     $('cRun').hidden = (s !== 'rec');
+    $('cReview').hidden = (s !== 'done');
     $('cLive').hidden = (s === 'idle');
     $('charts').hidden = (s !== 'rec' && s !== 'done');
     $('cDone').hidden = (s !== 'done');
-    $('clock').hidden = (s !== 'rec' && s !== 'done');
-    $('liveTitle').textContent = (s === 'rec') ? '計測中' : (s === 'done' ? '計測の結果' : 'いま映っているものの数字');
+    $('clock').hidden = (s !== 'rec');
+    video.hidden = (s === 'done'); $('still').hidden = (s !== 'done');
+    $('liveTitle').textContent = (s === 'rec') ? '計測中' : (s === 'done' ? 'つまみの位置の数字' : 'いま映っているものの数字');
     if (s === 'rec' || s === 'done') sizeCharts();
   }
 
@@ -204,10 +237,10 @@
     }
     if (deviceId) { try { localStorage.setItem('camId', deviceId); } catch (e) {} }
     // a new camera starts in automatic colour: any earlier lock no longer holds
-    wbLocked = false; whiteRef = null; lockLost = false;
+    wbLocked = false; whiteRef = null; lockLost = false; box = null;
     $('start').textContent = 'カメラを起動し直す'; $('start').className = 'sub';
     setState('ready');
-    renderLock();
+    renderLock(); applyView();
     if (!sampler) sampler = setInterval(sample, 250);
   }
 
@@ -215,11 +248,11 @@
     try {
       var devs = (await navigator.mediaDevices.enumerateDevices()).filter(function (d) { return d.kind === 'videoinput'; });
       var sel = $('cam'); sel.innerHTML = '';
-      var cur = getSettings().deviceId;
+      var curId = getSettings().deviceId;
       devs.forEach(function (d, i) {
         var o = document.createElement('option');
         o.value = d.deviceId; o.textContent = d.label || ('カメラ ' + (i + 1));
-        if (d.deviceId === cur) o.selected = true;
+        if (d.deviceId === curId) o.selected = true;
         sel.appendChild(o);
       });
       $('camWrap').hidden = devs.length < 2;
@@ -245,10 +278,7 @@
     $('lock').className = wbLocked ? 'sub' : '';
     $('unlock').hidden = !wbLocked;
   }
-
-  async function setWB(mode) {
-    await track.applyConstraints({ advanced: [{ whiteBalanceMode: mode }] });
-  }
+  async function setWB(mode) { await track.applyConstraints({ advanced: [{ whiteBalanceMode: mode }] }); }
 
   async function lockWB() {
     hide($('lockMsg'));
@@ -259,7 +289,7 @@
       return;
     }
     try {
-      if (wbLocked) { await setWB('continuous'); await new Promise(function (r) { setTimeout(r, 1500); }); }  // let it settle on the paper again
+      if (wbLocked) { await setWB('continuous'); await new Promise(function (r) { setTimeout(r, 1500); }); }
       await setWB('manual');
     } catch (e) {
       show($('lockMsg'), '色を固定できませんでした（' + e.name + '）。');
@@ -268,7 +298,6 @@
     wbLocked = true; lockLost = false; whiteRef = null; renderLock();
     setTimeout(function () { whiteRef = centerMean(); renderLock(); }, 700);
   }
-
   async function unlockWB() {
     try { await setWB('continuous'); } catch (e) {}
     wbLocked = false; whiteRef = null; renderLock();
@@ -277,6 +306,8 @@
   // ---------- image analysis ----------
   var A = document.createElement('canvas'), Bc = document.createElement('canvas'), pyr = [];
   var actx = null, bctx = null, AW = 0, AH = 0;
+  var SN = 400, snapC = document.createElement('canvas'); snapC.width = SN; snapC.height = SN;
+  var snapX = snapC.getContext('2d');
 
   function setupCanvases() {
     var vw = video.videoWidth, vh = video.videoHeight;
@@ -332,39 +363,70 @@
     bctx.imageSmoothingEnabled = true;
     bctx.drawImage(src, 0, 0, AW, AH);
     var a = actx.getImageData(0, 0, AW, AH).data, b = bctx.getImageData(0, 0, AW, AH).data;
-    var n = AW * AH, N4 = n * 4, i, bv, v;
+    var n = AW * AH, N4 = n * 4, i, bv, v, x, y;
     var hist = new Uint32Array(256);
     for (i = 0; i < N4; i += 4) { bv = b[i] > b[i + 1] ? b[i] : b[i + 1]; if (b[i + 2] > bv) bv = b[i + 2]; hist[bv]++; }
     var acc = 0, p95 = 255, need = n * 0.05;
     for (i = 255; i >= 0; i--) { acc += hist[i]; if (acc >= need) { p95 = i; break; } }
     var thr = Math.max(12, 0.5 * p95);
-    var field = 0, dark = 0, yel = 0, sr = 0, sg = 0, sb = 0, clip = 0;
-    for (i = 0; i < N4; i += 4) {
-      bv = b[i] > b[i + 1] ? b[i] : b[i + 1]; if (b[i + 2] > bv) bv = b[i + 2];
-      if (bv <= thr) continue;
-      field++;
-      var r = a[i], g = a[i + 1], bl = a[i + 2];
-      sr += r; sg += g; sb += bl;
-      v = r > g ? r : g; if (bl > v) v = bl;
-      if (v >= 250) clip++;
-      if (v < 0.80 * bv) dark++;
-      else if (v > 1.10 * bv) yel++;   // a fine point at least 10% brighter than its surroundings
+    var field = 0, dark = 0, yel = 0, sr = 0, sg = 0, sb = 0, clip = 0, sx = 0, sy = 0;
+    i = 0;
+    for (y = 0; y < AH; y++) {
+      for (x = 0; x < AW; x++, i += 4) {
+        bv = b[i] > b[i + 1] ? b[i] : b[i + 1]; if (b[i + 2] > bv) bv = b[i + 2];
+        if (bv <= thr) continue;
+        field++; sx += x; sy += y;
+        var r = a[i], g = a[i + 1], bl = a[i + 2];
+        sr += r; sg += g; sb += bl;
+        v = r > g ? r : g; if (bl > v) v = bl;
+        if (v >= 250) clip++;
+        if (v < 0.80 * bv) dark++;
+        else if (v > 1.10 * bv) yel++;   // a fine point at least 10% brighter than its surroundings
+      }
     }
     if (field < n * 0.02) return { ok: false, field: field / n };
     var R = sr / field, G = sg / field, B = sb / field, lab = rgb2lab(R, G, B);
-    return { ok: true, field: field / n, R: R, G: G, B: B, hue: rgb2hue(R, G, B), L: lab[0], a: lab[1], b: lab[2],
+    return { ok: true, field: field / n, cx: sx / field / AW, cy: sy / field / AH,
+             R: R, G: G, B: B, hue: rgb2hue(R, G, B), L: lab[0], a: lab[1], b: lab[2],
              yellow: 100 * yel / field, dark: 100 * dark / field, clip: 100 * clip / field };
   }
 
+  // ---------- the enlarged view of the lit field ----------
+  function viewBox() {
+    var vw = video.videoWidth, vh = video.videoHeight, mn = Math.min(vw, vh);
+    var b = box || { cx: vw / 2, cy: vh / 2, half: mn / 2 };
+    var half = Math.max(mn * 0.12, Math.min(mn / 2, b.half));
+    return { cx: Math.max(half, Math.min(vw - half, b.cx)), cy: Math.max(half, Math.min(vh - half, b.cy)), half: half };
+  }
+  function applyView() {
+    var vw = video.videoWidth; if (!vw) return;
+    var b = viewBox(), side = 2 * b.half;
+    video.style.width = (vw / side * 100) + '%';
+    video.style.left = (-(b.cx - b.half) / side * 100) + '%';
+    video.style.top = (-(b.cy - b.half) / side * 100) + '%';
+  }
+  function followField(m) {
+    var vw = video.videoWidth, vh = video.videoHeight;
+    var t = { cx: m.cx * vw, cy: m.cy * vh, half: 1.12 * Math.sqrt(m.field * vw * vh / Math.PI) };
+    if (!box) { box = t; applyView(); return; }
+    var k = (state === 'rec') ? 0.08 : 0.3;          // move slowly while recording so the picture stays steady
+    var nb = { cx: box.cx + k * (t.cx - box.cx), cy: box.cy + k * (t.cy - box.cy), half: box.half + k * (t.half - box.half) };
+    var moved = Math.abs(nb.cx - box.cx) + Math.abs(nb.cy - box.cy) + Math.abs(nb.half - box.half);
+    box = nb;
+    if (moved > Math.min(vw, vh) * 0.004) applyView();
+  }
+  function takeSnap(row) {
+    var b = viewBox();
+    try {
+      snapX.drawImage(video, b.cx - b.half, b.cy - b.half, 2 * b.half, 2 * b.half, 0, 0, SN, SN);
+      if (snapC.toBlob) snapC.toBlob(function (bl) { if (bl) row.snap = URL.createObjectURL(bl); }, 'image/jpeg', 0.72);
+      else row.snap = snapC.toDataURL('image/jpeg', 0.72);
+    } catch (e) {}
+  }
+
   // ---------- sampling loop ----------
-  function sample() {
-    if (!track || video.readyState < 2 || state === 'done') return;
-    tick++;
-    if (state === 'ready' && tick % 2) return;          // 2 per second while just looking
-    var m; try { m = analyze(); } catch (e) { return; }
-    if (!m) return;
-    var t = (state === 'rec') ? (performance.now() - tRec0) / 1000 : null;
-    if (m.ok) {
+  function showNums(m) {
+    if (m && m.ok) {
       $('nHue').textContent = r1(m.hue); $('nL').textContent = Math.round(m.L);
       $('nY').textContent = r1(m.yellow); $('nD').textContent = r1(m.dark);
       $('fieldNote').textContent = '光っている視野は画面の ' + Math.round(m.field * 100) + '% 。' + (m.clip > 2 ? '明るすぎて色が飛んでいる所が ' + Math.round(m.clip) + '% あります。' : '');
@@ -372,28 +434,30 @@
       $('nHue').textContent = $('nL').textContent = $('nY').textContent = $('nD').textContent = '–';
       $('fieldNote').textContent = '光っている視野が見つかりません。';
     }
+  }
+  function sample() {
+    if (!track || video.readyState < 2 || state === 'done') return;
+    tick++;
+    if (state === 'ready' && tick % 2) return;          // 2 per second while just looking
+    var m; try { m = analyze(); } catch (e) { return; }
+    if (!m) return;
+    if (m.ok) followField(m);
+    showNums(m);
     if (state === 'rec') {
-      rows.push({ t: t, m: m });
-      renderClock(t);
-      drawCharts(t);
-      if (tick % 8 === 0) checkLock(t);
+      var row = { t: (performance.now() - tRec0) / 1000, m: m, snap: null };
+      rows.push(row); takeSnap(row);
+      $('clock').textContent = '録画 ' + row.t.toFixed(1) + ' 秒';
+      drawCharts(row.t, null);
+      if (tick % 8 === 0) checkLock();
     }
   }
-
-  function checkLock(t) {
+  function checkLock() {
     if (!wbLocked || lockLost) return;
     var wb = getSettings().whiteBalanceMode;
     if (wb && wb !== 'manual') {
       lockLost = true;
-      marks.push({ t: t, label: '色の固定が外れた' });
       show($('runMsg'), '色の固定が外れました。この回の色の数字は、ここから先は当てになりません。');
     }
-  }
-
-  function renderClock(t) {
-    var c = $('clock');
-    if (tDrop === null) c.innerHTML = '録画 ' + t.toFixed(1) + ' 秒<small>酸を落としたら「滴下した」を押してください</small>';
-    else c.innerHTML = '滴下から ' + (t - tDrop).toFixed(1) + ' 秒' + (tOut !== null ? '<small>アウト：滴下から ' + (tOut - tDrop).toFixed(1) + ' 秒</small>' : '');
   }
 
   // ---------- charts ----------
@@ -404,9 +468,9 @@
       c.width = Math.round(w * dpr); c.height = Math.round(h * dpr);
       c.getContext('2d').setTransform(dpr, 0, 0, dpr, 0, 0);
     });
-    if (rows.length) drawCharts(rows[rows.length - 1].t);
+    if (rows.length) drawCharts(rows[rows.length - 1].t, state === 'done' ? rows[cur].t : null);
   }
-  function drawOne(id, key, lo, hi, tMax) {
+  function drawOne(id, key, lo, hi, tMax, cursor) {
     var c = $(id), w = c.clientWidth, h = c.clientHeight; if (!w) return;
     var x = c.getContext('2d');
     x.clearRect(0, 0, w, h);
@@ -421,9 +485,9 @@
     });
     x.fillText('0', 34, h - 2); x.fillText(Math.round(tMax) + '秒', w - 34, h - 2);
     x.setLineDash([4, 3]); x.strokeStyle = '#f0c04c'; x.fillStyle = '#f0c04c';
-    marks.forEach(function (m) {
+    marks().forEach(function (m) {
       x.beginPath(); x.moveTo(X(m.t), 4); x.lineTo(X(m.t), h - 14); x.stroke();
-      x.fillText(m.label.slice(0, 4), Math.min(X(m.t) + 3, w - 30), 12);
+      x.fillText(m.label, Math.min(X(m.t) + 3, w - 30), 12);
     });
     x.setLineDash([]); x.strokeStyle = '#4c9cf0'; x.lineWidth = 2; x.beginPath();
     var on = false;
@@ -432,12 +496,13 @@
       if (!on) { x.moveTo(X(r.t), Y(r.m[key])); on = true; } else x.lineTo(X(r.t), Y(r.m[key]));
     });
     x.stroke();
+    if (cursor !== null) { x.strokeStyle = '#ffffff'; x.lineWidth = 1.5; x.beginPath(); x.moveTo(X(cursor), 2); x.lineTo(X(cursor), h - 14); x.stroke(); }
   }
-  function drawCharts(t) {
-    var tMax = Math.max(30, t * 1.05);
-    drawOne('chHue', 'hue', 10, 40, tMax);
-    drawOne('chY', 'yellow', 0, 5, tMax);
-    drawOne('chL', 'L', 0, 50, tMax);
+  function drawCharts(t, cursor) {
+    var tMax = Math.max(30, t * 1.03);
+    drawOne('chHue', 'hue', 10, 40, tMax, cursor);
+    drawOne('chY', 'yellow', 0, 5, tMax, cursor);
+    drawOne('chL', 'L', 0, 50, tMax, cursor);
   }
 
   // ---------- recording ----------
@@ -446,6 +511,10 @@
     var c = ['video/mp4;codecs=avc1', 'video/mp4', 'video/webm;codecs=vp9', 'video/webm'];
     for (var i = 0; i < c.length; i++) { try { if (MediaRecorder.isTypeSupported(c[i])) return c[i]; } catch (e) {} }
     return '';
+  }
+  function clearRun() {
+    rows.forEach(function (r) { if (r.snap && r.snap.indexOf('blob:') === 0) { try { URL.revokeObjectURL(r.snap); } catch (e) {} } });
+    rows = []; chunks = []; recBlob = null; tDrop = null; tOut = null; tCand = null; cur = 0;
   }
 
   async function startRec() {
@@ -457,10 +526,8 @@
       return;
     }
     recArmed = false;
-    rows = []; marks = []; chunks = []; recBlob = null; tDrop = null; tOut = null; lockLost = false;
+    clearRun(); lockLost = false;
     hide($('runMsg'));
-    $('drop').textContent = '滴下した'; $('drop').className = 'mark';
-    $('out').textContent = '目で見て「アウト」'; $('out').className = 'mark';
     recMime = pickMime(); rec = null;
     if (recMime !== null) {
       try {
@@ -476,18 +543,55 @@
     try { if (navigator.wakeLock) wake = await navigator.wakeLock.request('screen'); } catch (e) {}
   }
 
-  function nowT() { return (performance.now() - tRec0) / 1000; }
-  function setMark(label, t) {
-    marks = marks.filter(function (m) { return m.label !== label; });
-    marks.push({ t: t, label: label });
-  }
-
   function stopRec() {
     if (state !== 'rec') return;
-    marks.push({ t: nowT(), label: '終了' });
     try { if (wake) { wake.release(); wake = null; } } catch (e) {}
     if (rec && rec.state !== 'inactive') { try { rec.stop(); return; } catch (e) {} }
     finish();
+  }
+
+  // ---------- review: choose drop and out on the pictures ----------
+  // The picture shakes when the liquid lands: offer the first big jump as a candidate.
+  function findDropCandidate() {
+    var ok = rows.filter(function (r) { return r.m.ok; });
+    if (ok.length < 16) return null;
+    var med = function (arr) { var s = arr.slice().sort(function (a, b) { return a - b; }); return s[Math.floor(s.length / 2)]; };
+    var dev = [];
+    for (var i = 8; i < ok.length; i++) {
+      var w = ok.slice(i - 8, i), m = ok[i].m;
+      dev.push({ t: ok[i].t,
+        d: Math.abs(m.R - med(w.map(function (r) { return r.m.R; }))) + Math.abs(m.G - med(w.map(function (r) { return r.m.G; })))
+           + 2 * Math.abs(m.yellow - med(w.map(function (r) { return r.m.yellow; }))) + 100 * Math.abs(m.field - med(w.map(function (r) { return r.m.field; }))) });
+    }
+    var ds = dev.map(function (x) { return x.d; }).sort(function (a, b) { return a - b; });
+    var calm = ds[Math.floor(ds.length * 0.2)];          // the quiet level: after the drop the picture keeps changing, so do not use the middle value
+    var thr = Math.max(10, 5 * calm);
+    for (var j = 0; j < dev.length; j++) if (dev[j].d > thr) return dev[j].t;
+    return null;
+  }
+  function indexAt(t) {
+    var best = 0, bd = 1e9;
+    rows.forEach(function (r, i) { var d = Math.abs(r.t - t); if (d < bd) { bd = d; best = i; } });
+    return best;
+  }
+  function goTo(i) {
+    if (!rows.length) return;
+    cur = Math.max(0, Math.min(rows.length - 1, i));
+    $('seek').value = String(cur);
+    var r = rows[cur];
+    if (r.snap) $('still').src = r.snap;
+    $('pos').textContent = '録画の頭から ' + r.t.toFixed(2) + ' 秒' + (tDrop !== null ? '　／　滴下から ' + (r.t - tDrop).toFixed(2) + ' 秒' : '');
+    showNums(r.m);
+    drawCharts(rows[rows.length - 1].t, r.t);
+  }
+  function renderMarks() {
+    var parts = [];
+    parts.push(tDrop !== null ? '滴下： 録画の頭から ' + tDrop.toFixed(2) + ' 秒' : '滴下： まだ決めていません');
+    parts.push(tOut !== null ? 'アウト： ' + (tDrop !== null ? '滴下から ' + (tOut - tDrop).toFixed(2) + ' 秒' : '録画の頭から ' + tOut.toFixed(2) + ' 秒') : 'アウト： まだ決めていません');
+    $('markState').textContent = parts.join('　｜　');
+    $('markState').className = (tDrop !== null && tOut !== null) ? 'state ok' : 'state';
+    renderSummary();
+    goTo(cur);
   }
 
   // ---------- results ----------
@@ -509,16 +613,18 @@
       'カメラ: ' + camLabel() + ' / ' + (st.width || '?') + 'x' + (st.height || '?') + ' / ' + (st.frameRate || '?') + 'fps',
       '色の調整: ' + (wbLocked ? (lockLost ? '固定（途中で外れた）' : '固定') : '自動（固定なし）') + ' / 終了時の値=' + (st.whiteBalanceMode || '不明'),
       '白い紙の色(赤/緑/青): ' + (whiteRef ? whiteRef.join('/') : 'なし'),
-      '印: ' + marks.map(function (m) { return m.label + '=' + r1(m.t) + '秒'; }).join(', '),
+      '滴下（映像で決めた時刻）: ' + (tDrop !== null ? r2(tDrop) + '秒' : '未設定'),
+      'アウト（映像で決めた時刻）: ' + (tOut !== null ? r2(tOut) + '秒' + (tDrop !== null ? '（滴下から' + r2(tOut - tDrop) + '秒）' : '') : '未設定'),
+      '揺れから見た滴下の候補: ' + (tCand !== null ? r2(tCand) + '秒' : 'なし'),
       'ブラウザ: ' + navigator.userAgent
     ];
   }
   function buildCsv() {
     var out = metaLines().map(function (l) { return '# ' + l; });
     out.push('t_sec,t_from_drop_sec,field_pct,R,G,B,hue,L,a,b,speck_pct,dark_pct,clip_pct,mark');
+    var iDrop = tDrop !== null ? indexAt(tDrop) : -1, iOut = tOut !== null ? indexAt(tOut) : -1;
     rows.forEach(function (r, i) {
-      var next = rows[i + 1] ? rows[i + 1].t : r.t + 0.25;
-      var mk = marks.filter(function (m) { return m.t >= r.t && m.t < next; }).map(function (m) { return m.label; }).join('/');
+      var mk = [i === iDrop ? '滴下' : '', i === iOut ? 'アウト' : ''].filter(Boolean).join('/');
       var m = r.m, td = (tDrop === null) ? '' : r2(r.t - tDrop);
       out.push(m.ok
         ? [r2(r.t), td, r1(m.field * 100), r1(m.R), r1(m.G), r1(m.B), r2(m.hue), r1(m.L), r1(m.a), r1(m.b), r2(m.yellow), r2(m.dark), r1(m.clip), mk].join(',')
@@ -534,15 +640,10 @@
       .concat(['動画: ' + (recBlob ? (recBlob.size / 1048576).toFixed(1) + 'MB ' + recBlob.type : 'なし'),
                '毎秒の値（秒:色あい/明るさ/明るい粒%/黒い点%/赤/緑/青）:', per.join(' ')]).join('\n');
   }
-
-  function finish() {
-    setState('done');
-    var tEnd = rows.length ? rows[rows.length - 1].t : 0;
-    drawCharts(tEnd);
-    var li = [];
+  function renderSummary() {
+    var tEnd = rows.length ? rows[rows.length - 1].t : 0, li = [];
     li.push('記録した時間： ' + r1(tEnd) + ' 秒');
-    if (tDrop !== null && tOut !== null) li.push('滴下から目で見た「アウト」まで： ' + r1(tOut - tDrop) + ' 秒');
-    else if (tDrop === null) li.push('「滴下した」が押されていません（時間は録画の頭から数えています）');
+    if (tDrop !== null && tOut !== null) li.push('滴下からアウトまで： ' + r2(tOut - tDrop) + ' 秒');
     var pts = [['始め', rows.length ? rows[0].t : 0]];
     if (tDrop !== null) pts.push(['滴下', tDrop]);
     if (tOut !== null) pts.push(['アウト', tOut]);
@@ -556,10 +657,20 @@
     li.push(recBlob ? '動画： ' + (recBlob.size / 1048576).toFixed(1) + ' MB' : '動画： なし');
     var ul = $('summary'); ul.innerHTML = '';
     li.forEach(function (t) { var e = document.createElement('li'); e.textContent = t; ul.appendChild(e); });
-    $('saveVideo').hidden = !recBlob;
     $('report').value = buildReport();
+  }
+
+  function finish() {
+    setState('done');
+    tCand = findDropCandidate();
+    $('seek').max = String(Math.max(0, rows.length - 1));
+    if (tCand !== null) { $('jump').textContent = '映像が大きく揺れた所（' + tCand.toFixed(1) + '秒）へ移動する'; $('jump').hidden = false; }
+    else $('jump').hidden = true;
+    $('saveVideo').hidden = !recBlob;
     hide($('copyMsg'));
-    renderClock(tEnd);
+    cur = (tCand !== null) ? indexAt(tCand) : 0;
+    renderMarks();
+    setTimeout(function () { goTo(cur); }, 300);        // the last pictures may still be finishing
   }
 
   function saveBlob(blob, name) {
@@ -581,29 +692,27 @@
   $('lock').addEventListener('click', lockWB);
   $('unlock').addEventListener('click', unlockWB);
   $('rec').addEventListener('click', startRec);
-  $('drop').addEventListener('click', function () {
-    var t = nowT(); tDrop = t; setMark('滴下', t);
-    $('drop').textContent = '滴下した ✓（押し直すと時刻を取り直します）'; $('drop').className = 'mark done';
-  });
-  $('out').addEventListener('click', function () {
-    var t = nowT(); tOut = t; setMark('アウト', t);
-    $('out').textContent = '「アウト」 ✓（押し直すと時刻を取り直します）'; $('out').className = 'mark done';
-  });
   $('stop').addEventListener('click', stopRec);
+  $('seek').addEventListener('input', function () { goTo(parseInt($('seek').value, 10) || 0); });
+  [['b-4', -4], ['b-1', -1], ['b1', 1], ['b4', 4]].forEach(function (p) { $(p[0]).addEventListener('click', function () { goTo(cur + p[1]); }); });
+  $('jump').addEventListener('click', function () { if (tCand !== null) goTo(indexAt(tCand)); });
+  $('setDrop').addEventListener('click', function () { if (rows.length) { tDrop = rows[cur].t; renderMarks(); } });
+  $('setOut').addEventListener('click', function () { if (rows.length) { tOut = rows[cur].t; renderMarks(); } });
   $('saveVideo').addEventListener('click', function () {
     if (recBlob) saveBlob(recBlob, baseName() + (recBlob.type.indexOf('webm') >= 0 ? '.webm' : '.mp4'));
   });
   $('saveCsv').addEventListener('click', function () { saveBlob(new Blob([buildCsv()], { type: 'text/csv' }), baseName() + '.csv'); });
   $('copy').addEventListener('click', function () {
-    var ta = $('report');
+    var ta = $('report'); ta.value = buildReport();
     var done = function () { show($('copyMsg'), 'コピーしました。'); };
     var manual = function () { ta.focus(); ta.select(); show($('copyMsg'), '自動でコピーできませんでした。下の文字を全部選んでコピーしてください。'); };
     if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(ta.value).then(done, manual); else manual();
   });
   $('next').addEventListener('click', function () {
-    rows = []; marks = []; chunks = []; recBlob = null; tDrop = null; tOut = null; $('memo').value = '';
-    setState('ready'); renderLock(); window.scrollTo(0, 0);
+    clearRun(); $('memo').value = ''; $('still').removeAttribute('src');
+    setState('ready'); renderLock(); applyView(); window.scrollTo(0, 0);
   });
+  video.addEventListener('loadedmetadata', applyView);
   window.addEventListener('resize', sizeCharts);
   window.addEventListener('beforeunload', function (e) { if (state === 'rec' || (state === 'done' && recBlob)) { e.preventDefault(); e.returnValue = ''; } });
 })();

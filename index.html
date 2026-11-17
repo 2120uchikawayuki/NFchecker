@@ -48,7 +48,7 @@
     <h2>1. カメラを起動する</h2>
     <button id="start">カメラを起動する</button>
     <div id="camWrap" hidden>
-      <p class="small" style="margin-top:8px">使うカメラ（背面に複数あるときは切り替えられます）</p>
+      <p class="small" style="margin-top:8px">使うカメラ（レンズが勝手に切り替わらないよう、最初から「背面カメラ」だけを使います。選び直したカメラは次回も覚えています）</p>
       <select id="cam"></select>
     </div>
     <video id="video" playsinline muted autoplay hidden></video>
@@ -147,18 +147,36 @@
       return;
     }
     stopStream();
-    var v = deviceId ? { deviceId: { exact: deviceId } } : { facingMode: { ideal: 'environment' } };
-    v.width = { ideal: 1280 }; v.height = { ideal: 720 };
+    var saved = null;
+    if (!deviceId) { try { saved = localStorage.getItem('camId'); } catch (e) {} }
+    var chosen = deviceId || saved;
+    var want = function (id) {
+      var v = id ? { deviceId: { exact: id } } : { facingMode: { ideal: 'environment' } };
+      v.width = { ideal: 1280 }; v.height = { ideal: 720 };
+      return { video: v, audio: false };
+    };
     try {
-      stream = await navigator.mediaDevices.getUserMedia({ video: v, audio: false });
+      stream = await navigator.mediaDevices.getUserMedia(want(chosen));
     } catch (e) {
-      show($('startMsg'), 'カメラを起動できませんでした（' + e.name + '）。カメラの使用を「許可」にして、もう一度押してください。');
-      return;
+      var failed = e;
+      if (saved && !deviceId) {          // remembered camera is gone: fall back to the default one
+        chosen = null;
+        try { stream = await navigator.mediaDevices.getUserMedia(want(null)); failed = null; } catch (e2) { failed = e2; }
+      }
+      if (failed) {
+        show($('startMsg'), 'カメラを起動できませんでした（' + failed.name + '）。カメラの使用を「許可」にして、もう一度押してください。');
+        return;
+      }
     }
     track = stream.getVideoTracks()[0];
     video.srcObject = stream; video.hidden = false;
     try { await video.play(); } catch (e) {}
     await listCams();
+    if (!chosen) {                       // first start: move to the single back lens so lenses do not swap
+      var single = findSingleBack();
+      if (single && single !== getSettings().deviceId) return start(single);
+    }
+    if (deviceId) { try { localStorage.setItem('camId', deviceId); } catch (e) {} }
     ['s2', 's3', 's4', 's5'].forEach(function (id) { $(id).hidden = false; });
     $('start').textContent = 'カメラを起動し直す'; $('start').className = 'sub';
     marks.push({ t: now(), label: '起動' });
@@ -182,6 +200,13 @@
       });
       $('camWrap').hidden = devs.length < 2;
     } catch (e) {}
+  }
+
+  var SINGLE_BACK = ['背面カメラ', 'Back Camera'];
+  function findSingleBack() {
+    var opts = $('cam').options;
+    for (var i = 0; i < opts.length; i++) if (SINGLE_BACK.indexOf(opts[i].textContent) >= 0) return opts[i].value;
+    return null;
   }
 
   function renderCaps() {
